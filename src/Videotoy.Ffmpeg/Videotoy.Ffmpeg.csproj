@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Videotoy.Ffmpeg</RootNamespace>
+    <AssemblyName>Videotoy.Ffmpeg</AssemblyName>
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Videotoy.Core\Videotoy.Core.fsproj" />
+    <ProjectReference Include="..\Videotoy.Rendering\Videotoy.Rendering.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Videotoy.App</RootNamespace>
+    <AssemblyName>Videotoy</AssemblyName>
+    <ApplicationIcon>Assets\Icons\app.ico</ApplicationIcon>
+    <StartupObject>Videotoy.App.App</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Videotoy.Core\Videotoy.Core.fsproj" />
+    <ProjectReference Include="..\Videotoy.Rendering\Videotoy.Rendering.csproj" />
+    <ProjectReference Include="..\Videotoy.Ffmpeg\Videotoy.Ffmpeg.csproj" />
+    <ProjectReference Include="..\Videotoy.Media\Videotoy.Media.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Icons\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\Localization\en.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Localization\fr.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\tools\ffmpeg\ffmpeg.exe" Condition="Exists('..\..\tools\ffmpeg\ffmpeg.exe')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>tools\ffmpeg\ffmpeg.exe</Link>
+    </None>
+    <None Include="..\..\tools\ffmpeg\ffmpeg.exe.sha256" Condition="Exists('..\..\tools\ffmpeg\ffmpeg.exe.sha256')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>tools\ffmpeg\ffmpeg.exe.sha256</Link>
+    </None>
+  </ItemGroup>
+
+</Project>

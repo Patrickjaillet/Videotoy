@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Videotoy.Core</RootNamespace>
+    <AssemblyName>Videotoy.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Version.fs" />
+    <Compile Include="Domain.fs" />
+    <Compile Include="LoopCalculator.fs" />
+    <Compile Include="ExportSettingsValidator.fs" />
+    <Compile Include="ExportProgressEstimator.fs" />
+    <Compile Include="ExportFileSizeEstimator.fs" />
+    <Compile Include="UniformBuilder.fs" />
+    <Compile Include="ShaderModel.fs" />
+    <Compile Include="LoopPeriodDetector.fs" />
+    <Compile Include="PassGraph.fs" />
+    <Compile Include="ShaderValidator.fs" />
+    <Compile Include="CustomUniformParser.fs" />
+    <Compile Include="GlslToHlslTranspiler.fs" />
+    <Compile Include="ShadertoyJsonParser.fs" />
+  </ItemGroup>
+
+</Project>
