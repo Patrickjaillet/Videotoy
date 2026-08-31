@@ -2,7 +2,7 @@
 #define MyAppPublisher "Patrick JAILLET"
 #define MyAppURL "https://patrickjaillet.github.io/Videotoy"
 #define MyAppExeName "Videotoy.exe"
-#define MyAppExePath "..\src\Videotoy.App\bin\Release\net8.0-windows10.0.19041.0\" + MyAppExeName
+#define MyAppExePath "..\src\Videotoy.App\bin\x64\Release\net8.0-windows10.0.19041.0\" + MyAppExeName
 #define MyAppIcon "..\src\Videotoy.App\Assets\Icons\app.ico"
 #define MyInstallerIcon "installer.ico"
 
@@ -61,7 +61,7 @@ OutputDir=Output
 OutputBaseFilename=Videotoy-Setup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 SetupIconFile={#MyInstallerIcon}
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -79,9 +79,9 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\src\Videotoy.App\bin\Release\net8.0-windows10.0.19041.0\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+Source: "..\src\Videotoy.App\bin\x64\Release\net8.0-windows10.0.19041.0\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
 
-#if !FileExists("..\src\Videotoy.App\bin\Release\net8.0-windows10.0.19041.0\tools\ffmpeg\ffmpeg.exe")
+#if !FileExists("..\src\Videotoy.App\bin\x64\Release\net8.0-windows10.0.19041.0\tools\ffmpeg\ffmpeg.exe")
   #error "ffmpeg.exe is missing from the build output. Run the Release build with tools\ffmpeg\ffmpeg.exe present before packaging the installer."
 #endif
 
