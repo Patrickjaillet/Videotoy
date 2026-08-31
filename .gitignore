@@ -11,6 +11,7 @@ obj/
 installer/Output/
 
 *.log
+*.zip
 
 /tools/ffmpeg/*
 !/tools/ffmpeg/.gitkeep
