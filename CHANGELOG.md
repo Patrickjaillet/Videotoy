@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-01
+
+Consolidation release. No functional changes of its own beyond the fixes
+below — this is a synthesis of everything shipped since v1.0.0, across
+eight feature phases:
+
+- **v1.1.0** — Hardware encoders (NVENC/Quick Sync/AMF), extended encoding
+  options, automatic export retry, and an export history panel.
+- **v1.2.0** — WebM (VP9/Opus) and MOV/ProRes container/codec support.
+- **v1.3.0** — Animated image export: GIF (with palette/dithering options)
+  and animated WebP.
+- **v1.4.0** — Video files as `iChannel` inputs, decoded deterministically
+  by timestamp; fixed a long-standing bug where image/audio `iChannel`
+  bindings and multi-pass Buffer A-D inputs never actually reached the GPU
+  during export.
+- **v1.5.0** — Render queue: batch export multiple shaders sequentially,
+  with drag-reorder, thumbnails, per-item progress, error isolation, and
+  persistence across restarts.
+- **v1.6.0** — Undo/redo on render/export settings and custom-uniform
+  sliders, with cascade-aware snapshots and gesture coalescing.
+- **v1.7.0** — Automatic shader-language detection and support for WGSL and
+  native HLSL sources alongside GLSL, with a status-bar override.
+- **v1.8.0** — UI/UX refresh: thematic collapsible settings sections,
+  keyboard accessibility, a first-launch onboarding overlay, Shader Issues
+  filters, a quick-action toolbar, and an animation-performance pass.
+
+### Fixed
+
+- The render queue's persisted/in-memory item list has no automatic
+  pruning of completed or failed entries — flagged during this phase's
+  static review as a known limitation (not fixed here, since auto-pruning
+  needs a product decision on retention, e.g. whether failed items should
+  ever disappear on their own); the video-frame LRU cache (256 MB bound)
+  and the undo/redo stack (cleared on every shader load) were both
+  reviewed and found sound.
+
 ## [1.8.0] - 2026-09-01
 
 ### Added
