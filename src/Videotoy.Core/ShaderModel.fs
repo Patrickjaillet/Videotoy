@@ -96,6 +96,11 @@ let channelAudioPath (channel: ChannelSource) : string option =
     | MusicStream -> channel.AssetPath
     | _ -> None
 
+let channelVideoPath (channel: ChannelSource) : string option =
+    match channel.InputType with
+    | Video -> channel.AssetPath
+    | _ -> None
+
 /// Chemin (tel que déclaré dans le shader, relatif ou absolu) de la première
 /// source audio trouvée sur n'importe quel `iChannel` de n'importe quelle
 /// passe du projet, ou `None` si le shader n'utilise aucune entrée audio.

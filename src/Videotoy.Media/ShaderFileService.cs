@@ -15,6 +15,8 @@ public sealed class LoadedShader
 
     public required IReadOnlyDictionary<string, AudioTrack> AudioTracks { get; init; }
 
+    public required IReadOnlyDictionary<string, Videotoy.Ffmpeg.VideoTextureSource> VideoSources { get; init; }
+
     public required IReadOnlyDictionary<string, Videotoy.Core.GlslToHlslTranspiler.TranspileResult> HlslPasses { get; init; }
 
     public bool HasErrors => Issues.Any(issue => issue.IsErrorIssue);
@@ -27,11 +29,16 @@ public sealed class ShaderFileService
 
     private readonly TextureLoader _textureLoader;
     private readonly AudioTrackLoader _audioTrackLoader;
+    private readonly Videotoy.Ffmpeg.VideoTextureLoader _videoTextureLoader;
 
-    public ShaderFileService(TextureLoader textureLoader, AudioTrackLoader audioTrackLoader)
+    public ShaderFileService(
+        TextureLoader textureLoader,
+        AudioTrackLoader audioTrackLoader,
+        Videotoy.Ffmpeg.VideoTextureLoader videoTextureLoader)
     {
         _textureLoader = textureLoader;
         _audioTrackLoader = audioTrackLoader;
+        _videoTextureLoader = videoTextureLoader;
     }
 
     public static bool IsSupportedShaderFile(string filePath)
@@ -82,6 +89,7 @@ public sealed class ShaderFileService
         var baseDirectory = Path.GetDirectoryName(filePath) ?? string.Empty;
         var textures = new Dictionary<string, TextureAsset>(StringComparer.OrdinalIgnoreCase);
         var audioTracks = new Dictionary<string, AudioTrack>(StringComparer.OrdinalIgnoreCase);
+        var videoSources = new Dictionary<string, Videotoy.Ffmpeg.VideoTextureSource>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var pass in Videotoy.Core.ShaderModel.allPasses(project))
         {
@@ -98,6 +106,12 @@ public sealed class ShaderFileService
                 {
                     LoadAudio(pass.Name, baseDirectory, audioPath.Value, audioTracks, issues);
                 }
+
+                var videoPath = Videotoy.Core.ShaderModel.channelVideoPath(channel);
+                if (videoPath is not null && !videoSources.ContainsKey(videoPath.Value))
+                {
+                    LoadVideo(pass.Name, baseDirectory, videoPath.Value, videoSources, issues);
+                }
             }
         }
 
@@ -107,6 +121,7 @@ public sealed class ShaderFileService
             Issues = issues,
             Textures = textures,
             AudioTracks = audioTracks,
+            VideoSources = videoSources,
             HlslPasses = hlslPasses
         };
     }
@@ -158,6 +173,36 @@ public sealed class ShaderFileService
         catch (Exception ex)
         {
             issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Failed to load audio source '{relativeOrAbsolutePath}': {ex.Message}"));
+        }
+    }
+
+    private void LoadVideo(
+        string passName,
+        string baseDirectory,
+        string relativeOrAbsolutePath,
+        IDictionary<string, Videotoy.Ffmpeg.VideoTextureSource> videoSources,
+        ICollection<Videotoy.Core.ShaderModel.ShaderIssue> issues)
+    {
+        var resolvedPath = ResolveAssetPath(baseDirectory, relativeOrAbsolutePath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Video file not found: '{relativeOrAbsolutePath}'."));
+            return;
+        }
+
+        try
+        {
+            var probe = _videoTextureLoader.ProbeAsync(resolvedPath).GetAwaiter().GetResult();
+            videoSources[relativeOrAbsolutePath] = new Videotoy.Ffmpeg.VideoTextureSource
+            {
+                FilePath = resolvedPath,
+                Probe = probe
+            };
+        }
+        catch (Exception ex)
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Failed to load video source '{relativeOrAbsolutePath}': {ex.Message}"));
         }
     }
 

@@ -29,9 +29,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly LocalizationService _localizationService;
     private readonly MultiPassRenderer _previewRenderer;
     private readonly PreviewClock _previewClock = new();
-    private readonly IShaderRenderer _exportRenderer;
+    private readonly ExportMultiPassRenderer _exportRenderer;
     private readonly VideoExportPipeline _exportPipeline;
     private readonly AnimatedImageExportPipeline _animatedImageExportPipeline;
+    private readonly AudioSpectrumTextureGenerator _audioSpectrumTextureGenerator;
+    private readonly VideoTextureLoader _videoTextureLoader;
 
     private WriteableBitmap? _previewBitmap;
     private LoadedShader? _loadedShader;
@@ -566,6 +568,35 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _hasCustomUniforms;
 
     /// <summary>
+    /// Un élément par channel vidéo détecté dans le shader actuellement
+    /// chargé — voir <see cref="Videotoy.Core.ShaderModel.channelVideoPath"/>.
+    /// Reconstruite entièrement à chaque chargement de shader ; vide tant
+    /// qu'aucun shader ne référence de source vidéo.
+    /// </summary>
+    public ObservableCollection<VideoChannelViewModel> VideoChannels { get; } = new();
+
+    /// <summary>
+    /// Vrai lorsque le shader chargé référence au moins un channel vidéo,
+    /// pilote l'affichage de la card "Video Channels" du panneau de
+    /// paramètres de rendu.
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasVideoChannels;
+
+    /// <summary>
+    /// Non bloquant : au moins un channel vidéo dont la durée sondée ne
+    /// correspond pas à <see cref="LoopDurationSeconds"/> en mode Boucle
+    /// parfaite. Purement informatif — un channel vidéo boucle/se fige
+    /// légitimement quel que soit l'écart, selon son
+    /// <see cref="VideoTimeMappingOption"/>.
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasVideoLoopDurationMismatch;
+
+    [ObservableProperty]
+    private string _videoLoopDurationMismatchSummary = string.Empty;
+
+    /// <summary>
     /// Preset currently selected in the "Load preset" combo box. Loading
     /// (<see cref="LoadExportPresetCommand"/>) applies it to every panel
     /// input it covers; it does not itself change any setting until the
@@ -590,10 +621,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ExportHistoryService exportHistoryService,
         LoopSettingsService loopSettingsService,
         LocalizationService localizationService,
-        MultiPassRenderer previewRenderer,
-        IShaderRenderer exportRenderer,
+        PreviewMultiPassRenderer previewRenderer,
+        ExportMultiPassRenderer exportRenderer,
         VideoExportPipeline exportPipeline,
-        AnimatedImageExportPipeline animatedImageExportPipeline)
+        AnimatedImageExportPipeline animatedImageExportPipeline,
+        AudioSpectrumTextureGenerator audioSpectrumTextureGenerator,
+        VideoTextureLoader videoTextureLoader)
     {
         _shaderFileService = shaderFileService;
         _recentFilesService = recentFilesService;
@@ -605,6 +638,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _exportRenderer = exportRenderer;
         _exportPipeline = exportPipeline;
         _animatedImageExportPipeline = animatedImageExportPipeline;
+        _audioSpectrumTextureGenerator = audioSpectrumTextureGenerator;
+        _videoTextureLoader = videoTextureLoader;
         _previewClock.LoopDurationSeconds = _loopDurationSeconds;
         _previewClock.TimeChanged += OnPreviewClockTimeChanged;
 
@@ -867,6 +902,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? CoreLoopCalculator.suggestAssistedLoopSeconds(LoopDurationSeconds, frameRate)
             : LoopDurationSeconds;
 
+        UpdateVideoLoopDurationMismatch();
+
         if (IsAnimatedImageExportModeSelected)
         {
             var estimatedAnimatedImageBytes = CoreAnimatedImageFileSizeEstimator.estimateFileSizeBytes(
@@ -898,6 +935,36 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // elle ne refléterait plus la configuration actuelle.
         HasLoopSeamPreview = false;
         GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Compare la durée sondée de chaque <see cref="VideoChannels"/> à
+    /// <see cref="LoopDurationSeconds"/> lorsque "Boucle parfaite" est
+    /// active, et publie un avertissement non bloquant en cas d'écart —
+    /// même tolérance que <see cref="Core.LoopCalculator"/>'s notion
+    /// d'arrondi de frame, ici appliquée à une simple comparaison de
+    /// durées plutôt qu'à un nombre de frames exact.
+    /// </summary>
+    private void UpdateVideoLoopDurationMismatch()
+    {
+        const double toleranceSeconds = 0.05;
+
+        if (!IsSeamlessLoopModeEnabled || VideoChannels.Count == 0)
+        {
+            HasVideoLoopDurationMismatch = false;
+            VideoLoopDurationMismatchSummary = string.Empty;
+            return;
+        }
+
+        var mismatched = VideoChannels
+            .Where(channel => Math.Abs(channel.Source.Probe.DurationSeconds - LoopDurationSeconds) > toleranceSeconds)
+            .ToList();
+
+        HasVideoLoopDurationMismatch = mismatched.Count > 0;
+        VideoLoopDurationMismatchSummary = mismatched.Count == 0
+            ? string.Empty
+            : string.Join("; ", mismatched.Select(channel =>
+                $"{channel.DisplayLabel}: video is {channel.Source.Probe.DurationSeconds:0.00}s, loop is {LoopDurationSeconds:0.00}s"));
     }
 
     [RelayCommand]
@@ -1177,8 +1244,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            _exportRenderer.Initialize(new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height));
-            _exportRenderer.LoadShader(_loadedShader.HlslPasses["Image"].HlslSource);
+            var (images, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
+            _exportRenderer.Initialize(
+                new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height),
+                _loadedShader.Project,
+                _loadedShader.HlslPasses,
+                images,
+                audioTracks,
+                videoSources);
 
             await _exportPipeline.RunAsync(
                 exportSettings,
@@ -1339,8 +1412,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            _exportRenderer.Initialize(new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height));
-            _exportRenderer.LoadShader(_loadedShader.HlslPasses["Image"].HlslSource);
+            var (images, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
+            _exportRenderer.Initialize(
+                new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height),
+                _loadedShader.Project,
+                _loadedShader.HlslPasses,
+                images,
+                audioTracks,
+                videoSources);
 
             await _animatedImageExportPipeline.RunAsync(exportSettings, progress, _exportCancellationTokenSource.Token);
 
@@ -1717,12 +1796,107 @@ public sealed partial class MainWindowViewModel : ObservableObject
         HasCustomUniforms = CustomUniformGroups.Count > 0;
     }
 
+    /// <summary>
+    /// Reconstruit intégralement <see cref="VideoChannels"/> à partir des
+    /// channels vidéo effectivement chargés dans <paramref name="loadedShader"/> :
+    /// un élément par (passe, index de channel) dont
+    /// <see cref="Videotoy.Core.ShaderModel.channelVideoPath"/> résout vers
+    /// une entrée de <see cref="LoadedShader.VideoSources"/> — même
+    /// convention d'énumération que <see cref="CustomUniformDeclarations"/>.
+    /// </summary>
+    private void ReloadVideoChannels(LoadedShader loadedShader)
+    {
+        VideoChannels.Clear();
+
+        foreach (var pass in Videotoy.Core.ShaderModel.allPasses(loadedShader.Project))
+        {
+            var channels = new[] { pass.Channel0, pass.Channel1, pass.Channel2, pass.Channel3 };
+
+            for (var channelIndex = 0; channelIndex < channels.Length; channelIndex++)
+            {
+                var channel = channels[channelIndex];
+                if (channel is null)
+                {
+                    continue;
+                }
+
+                var videoPath = Videotoy.Core.ShaderModel.channelVideoPath(channel.Value);
+                if (videoPath is null || !loadedShader.VideoSources.TryGetValue(videoPath.Value, out var source))
+                {
+                    continue;
+                }
+
+                var viewModel = new VideoChannelViewModel(_videoTextureLoader)
+                {
+                    PassName = pass.Name,
+                    ChannelIndex = channelIndex,
+                    Source = source,
+                    SelectedTimeMapping = VideoTimeMappingOption.FromValue(source.TimeMapping)
+                };
+
+                VideoChannels.Add(viewModel);
+            }
+        }
+
+        HasVideoChannels = VideoChannels.Count > 0;
+    }
+
+    /// <summary>
+    /// Convertit <see cref="LoadedShader.Textures"/>/<c>.AudioTracks</c>/
+    /// <c>.VideoSources</c> vers les types neutres attendus par
+    /// <see cref="MultiPassRenderer.Initialize"/>
+    /// (<see cref="BoundImageAsset"/>/<see cref="BoundAudioAsset"/>/
+    /// <see cref="BoundVideoAsset"/>) — cette conversion existe uniquement
+    /// pour que <c>Videotoy.Rendering</c> n'ait jamais besoin de référencer
+    /// <c>Videotoy.Media</c>/<c>Videotoy.Ffmpeg</c> (cycle de dépendances,
+    /// puisque ces deux projets référencent déjà <c>Videotoy.Rendering</c>).
+    /// </summary>
+    private (
+        IReadOnlyDictionary<string, BoundImageAsset> Images,
+        IReadOnlyDictionary<string, BoundAudioAsset> AudioTracks,
+        IReadOnlyDictionary<string, BoundVideoAsset> VideoSources)
+        BuildBoundAssets(LoadedShader loadedShader)
+    {
+        var images = loadedShader.Textures.ToDictionary(
+            pair => pair.Key,
+            pair => new BoundImageAsset(pair.Value.Width, pair.Value.Height, pair.Value.PixelDataBgra));
+
+        var audioTracks = loadedShader.AudioTracks.ToDictionary(
+            pair => pair.Key,
+            pair =>
+            {
+                var track = pair.Value;
+                return new BoundAudioAsset(timeSeconds => _audioSpectrumTextureGenerator.Generate(track, timeSeconds).PixelDataBgra);
+            });
+
+        var videoSources = loadedShader.VideoSources.ToDictionary(
+            pair => pair.Key,
+            pair =>
+            {
+                var source = pair.Value;
+                return new BoundVideoAsset((renderTimeSeconds, targetWidth, targetHeight) =>
+                {
+                    var playbackTimeSeconds = Videotoy.Core.VideoTimeMapping.resolveVideoPlaybackTimeSeconds(
+                        source.TimeMapping, source.Probe.DurationSeconds, renderTimeSeconds);
+
+                    return _videoTextureLoader
+                        .GetFramePixelsBgraAsync(source.FilePath, playbackTimeSeconds, targetWidth, targetHeight)
+                        .GetAwaiter()
+                        .GetResult();
+                });
+            });
+
+        return (images, audioTracks, videoSources);
+    }
+
     private void InitializePreview(LoadedShader loadedShader)
     {
         _loadedShader = loadedShader;
 
-        _previewRenderer.Initialize(RenderTargetSize.PreviewDefault, loadedShader.Project, loadedShader.HlslPasses);
+        var (images, audioTracks, videoSources) = BuildBoundAssets(loadedShader);
+        _previewRenderer.Initialize(RenderTargetSize.PreviewDefault, loadedShader.Project, loadedShader.HlslPasses, images, audioTracks, videoSources);
         ReloadCustomUniformGroups();
+        ReloadVideoChannels(loadedShader);
 
         _previewBitmap = new WriteableBitmap(
             RenderTargetSize.PreviewDefault.Width,

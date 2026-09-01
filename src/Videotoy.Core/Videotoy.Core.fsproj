@@ -17,6 +17,7 @@
     <Compile Include="AnimatedImageFileSizeEstimator.fs" />
     <Compile Include="UniformBuilder.fs" />
     <Compile Include="ShaderModel.fs" />
+    <Compile Include="VideoTimeMapping.fs" />
     <Compile Include="LoopPeriodDetector.fs" />
     <Compile Include="PassGraph.fs" />
     <Compile Include="ShaderValidator.fs" />

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -119,6 +120,52 @@ public partial class MainWindow : Window
 
         return data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files
                && ShaderFileService.IsSupportedShaderFile(files[0]);
+    }
+
+    private static readonly string[] SupportedVideoExtensions = { ".mp4", ".webm", ".mov" };
+
+    private static bool IsDroppableVideoFile(IDataObject data)
+    {
+        if (!data.GetDataPresent(DataFormats.FileDrop))
+        {
+            return false;
+        }
+
+        return data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files
+               && SupportedVideoExtensions.Contains(System.IO.Path.GetExtension(files[0]).ToLowerInvariant());
+    }
+
+    /// <summary>
+    /// Empêche la propagation vers <see cref="OnDragEnter"/> (drop de shader
+    /// sur toute la fenêtre) : un glisser-déposer sur une zone de channel
+    /// vidéo n'a de sens que pour un fichier vidéo, jamais pour un shader.
+    /// </summary>
+    private void OnVideoChannelDragEnter(object sender, DragEventArgs e)
+    {
+        e.Effects = IsDroppableVideoFile(e.Data) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnVideoChannelDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+
+        if (sender is not FrameworkElement { DataContext: VideoChannelViewModel viewModel })
+        {
+            return;
+        }
+
+        if (!IsDroppableVideoFile(e.Data))
+        {
+            return;
+        }
+
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } files)
+        {
+            return;
+        }
+
+        await viewModel.HandleFileDroppedAsync(files[0]);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)

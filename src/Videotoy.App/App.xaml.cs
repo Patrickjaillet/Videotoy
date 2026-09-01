@@ -76,9 +76,18 @@ public partial class App : Application
         services.AddSingleton<FfmpegIntegrityVerifier>();
         services.AddSingleton<HardwareEncoderProbe>();
         services.AddSingleton<FfmpegService>();
-        services.AddSingleton<IShaderRenderer, D3D11ShaderRenderer>();
-        services.AddSingleton<MultiPassRenderer>();
-        services.AddSingleton<FrameSequenceRenderer>();
+        services.AddSingleton<VideoProber>();
+        services.AddSingleton<VideoFrameDecoder>();
+        services.AddSingleton<VideoTextureLoader>();
+        services.AddSingleton<PreviewMultiPassRenderer>();
+        services.AddSingleton<ExportMultiPassRenderer>();
+
+        // FrameSequenceRenderer (consommé par les pipelines d'export) doit
+        // toujours utiliser le renderer dédié à l'export, jamais celui de
+        // la prévisualisation : résolution explicite plutôt que de laisser
+        // le conteneur choisir arbitrairement entre les deux MultiPassRenderer
+        // enregistrés.
+        services.AddSingleton(sp => new FrameSequenceRenderer(sp.GetRequiredService<ExportMultiPassRenderer>()));
         services.AddSingleton<VideoExportPipeline>();
         services.AddSingleton<AnimatedImageExportPipeline>();
 

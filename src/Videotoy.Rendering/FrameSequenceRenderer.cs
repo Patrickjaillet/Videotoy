@@ -4,9 +4,9 @@ namespace Videotoy.Rendering;
 
 public sealed class FrameSequenceRenderer
 {
-    private readonly IShaderRenderer _renderer;
+    private readonly MultiPassRenderer _renderer;
 
-    public FrameSequenceRenderer(IShaderRenderer renderer)
+    public FrameSequenceRenderer(MultiPassRenderer renderer)
     {
         _renderer = renderer;
     }

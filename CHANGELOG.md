@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-01
+
+### Added
+
+- Video files as `iChannel` inputs (MP4/WebM/MOV), decoded deterministically
+  frame-by-frame by timestamp — never real-time playback — via a new
+  seek-per-request `VideoTextureLoader` (`Videotoy.Ffmpeg`), bounded by a
+  256 MB LRU frame cache keyed on a resolved frame index so repeated
+  requests for the same source frame (preview scrubbing, or the identical
+  timeline re-rendered by GIF's two-pass export) always hit the cache
+- Configurable time-mapping between render `iTime` and a video channel's
+  playback position — Linear, Looped (default), or Frozen on last frame —
+  set per channel in a new "Video Channels" settings-panel card
+- Drag-and-drop reassignment of a video channel's backing file directly in
+  the settings panel
+- A non-blocking warning when a bound video channel's probed duration
+  doesn't match the configured Seamless Loop duration
+- `ShaderModel.channelVideoPath` and `PassGraph.assetChannelBindings`
+  (Core), completing the existing `channelTexturePath`/`channelAudioPath`
+  boundary-function family for the already-present `Video` channel type
+
+### Fixed
+
+- **`iChannel` image-texture and audio-track bindings never reached the
+  GPU.** Despite being advertised as shipped, `TextureAsset`/`AudioTrack`
+  were loaded into `LoadedShader` but `MultiPassRenderer` never created or
+  bound any shader resource for them — every image/audio `iChannel` input
+  has silently rendered as black since this project's first release. Fixed
+  by building the GPU channel-binding mechanism this phase needed for
+  video anyway (static upload for image textures, per-frame `Map`/`Unmap`
+  refresh for audio-spectrum and video-frame textures).
+- **Every export (video, GIF, WebP) ignored Buffer A/B/C/D passes and all
+  channel inputs.** Export used a single-pass, channel-less renderer
+  (`IShaderRenderer`/`D3D11ShaderRenderer`, only ever loading the Image
+  pass HLSL) entirely separate from the multi-pass renderer used by the
+  live preview — every exported video/GIF/WebP from a multi-pass or
+  channel-using shader has been silently wrong since this project's first
+  release. Fixed by unifying export onto `MultiPassRenderer`
+  (`FrameSequenceRenderer` and both export pipelines now drive the same
+  renderer type the preview already used correctly).
+
+### Known limitations
+
+- Seek-per-request video decode re-invokes `ffmpeg.exe` per uncached
+  frame — acceptable for deterministic offline rendering, not for smooth
+  real-time scrubbing of long source videos (mitigated, not eliminated, by
+  the LRU cache)
+- `IShaderRenderer`/`D3D11ShaderRenderer`/`NullShaderRenderer` are now dead
+  code (no longer registered for the export path), slated for removal in a
+  future cleanup pass
+- The `Cubemap` `iChannel` type remains unbound — out of scope, no roadmap
+  item has requested it
+
 ## [1.3.0] - 2026-09-01
 
 ### Added

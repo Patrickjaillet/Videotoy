@@ -776,6 +776,52 @@
                                 </Border>
                             </StackPanel>
 
+                            <StackPanel Visibility="{Binding HasVideoChannels, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="{loc:Loc Key=panel.videoChannels.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
+                                <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                    <StackPanel>
+                                        <ItemsControl ItemsSource="{Binding VideoChannels}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type vm:VideoChannelViewModel}">
+                                                    <StackPanel Margin="0,0,0,14">
+                                                        <TextBlock Text="{Binding DisplayLabel}"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                                   Margin="0,0,0,6" />
+                                                        <Border Style="{StaticResource CardBorderStyle}"
+                                                                Padding="10"
+                                                                AllowDrop="True"
+                                                                DragEnter="OnVideoChannelDragEnter"
+                                                                Drop="OnVideoChannelDrop">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding FileName}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource LabelStyle}" />
+                                                                <TextBlock Text="{loc:Loc Key=panel.videoChannels.dropHint}"
+                                                                           TextWrapping="Wrap"
+                                                                           Style="{StaticResource LabelStyle}"
+                                                                           Margin="0,4,0,0" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <TextBlock Text="{loc:Loc Key=panel.videoChannels.timeMapping}" Style="{StaticResource LabelStyle}" Margin="0,8,0,4" />
+                                                        <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                                  ItemsSource="{Binding TimeMappingOptions}"
+                                                                  SelectedItem="{Binding SelectedTimeMapping}"
+                                                                  DisplayMemberPath="DisplayName" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="{Binding VideoLoopDurationMismatchSummary}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Foreground="{StaticResource DangerBrush}"
+                                                   Visibility="{Binding HasVideoLoopDurationMismatch, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
                             <TextBlock Text="{loc:Loc Key=panel.durationMode.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
                             <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
                                 <StackPanel>

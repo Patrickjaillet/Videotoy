@@ -106,3 +106,18 @@ let bufferChannelBindings (project: ShaderProject) (pass: ShaderPass) : (int * s
             resolveBufferPassName passesByNormalizedName name
             |> Option.map (fun resolvedName -> index, resolvedName)
         | _ -> None)
+
+/// Pour une passe donnée, associe chaque index de channel qui référence un
+/// asset externe (texture image, audio, vidéo — jamais un buffer ni un
+/// cubemap, non pris en charge) à sa ChannelSource complète, pour
+/// résolution du fichier et du type côté C# via channelTexturePath/
+/// channelAudioPath/channelVideoPath.
+let assetChannelBindings (pass: ShaderPass) : (int * ChannelSource) list =
+    [ 0, pass.Channel0
+      1, pass.Channel1
+      2, pass.Channel2
+      3, pass.Channel3 ]
+    |> List.choose (fun (index, channel) ->
+        match channel with
+        | Some ({ InputType = Texture | Music | MusicStream | Video } as source) -> Some(index, source)
+        | _ -> None)

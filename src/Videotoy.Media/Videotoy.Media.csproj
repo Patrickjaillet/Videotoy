@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Videotoy.Core\Videotoy.Core.fsproj" />
+    <ProjectReference Include="..\Videotoy.Ffmpeg\Videotoy.Ffmpeg.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -100,6 +100,10 @@
   "panel.customUniforms.sectionLabel": "CUSTOM UNIFORMS",
   "panel.customUniforms.description": "Live preview of the custom uniforms exposed by this shader. Changes apply instantly to the preview and have no effect on the exported video.",
 
+  "panel.videoChannels.sectionLabel": "VIDEO CHANNELS",
+  "panel.videoChannels.dropHint": "Drop a video file (.mp4/.webm/.mov) here to replace",
+  "panel.videoChannels.timeMapping": "Time mapping",
+
   "panel.durationMode": "Duration Mode",
   "panel.durationMode.sectionLabel": "DURATION MODE",
   "panel.durationMode.manual": "Manual duration",
