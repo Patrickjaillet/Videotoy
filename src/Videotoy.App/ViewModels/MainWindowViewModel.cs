@@ -11,6 +11,7 @@ using Videotoy.Ffmpeg;
 using Videotoy.Media;
 using Videotoy.Rendering;
 using CoreFileSizeEstimator = Videotoy.Core.ExportFileSizeEstimator;
+using CoreAnimatedImageFileSizeEstimator = Videotoy.Core.AnimatedImageFileSizeEstimator;
 using CoreLoopCalculator = Videotoy.Core.LoopCalculator;
 
 namespace Videotoy.App.ViewModels;
@@ -30,6 +31,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly PreviewClock _previewClock = new();
     private readonly IShaderRenderer _exportRenderer;
     private readonly VideoExportPipeline _exportPipeline;
+    private readonly AnimatedImageExportPipeline _animatedImageExportPipeline;
 
     private WriteableBitmap? _previewBitmap;
     private LoadedShader? _loadedShader;
@@ -296,6 +298,43 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public IReadOnlyList<FrameRatePresetOption> FrameRatePresets => FrameRatePresetOption.All;
 
+    public IReadOnlyList<ExportKindOption> ExportKindOptions => ExportKindOption.All;
+
+    public IReadOnlyList<AnimatedImageFormatOption> AnimatedImageFormatOptions => AnimatedImageFormatOption.All;
+
+    public IReadOnlyList<GifDitherOption> GifDitherOptions => GifDitherOption.All;
+
+    public bool IsVideoExportModeSelected => SelectedExportKind == ExportKindOption.Video;
+
+    public bool IsAnimatedImageExportModeSelected => SelectedExportKind == ExportKindOption.AnimatedImage;
+
+    public bool IsGifFormatSelected => SelectedAnimatedImageFormat == AnimatedImageFormatOption.Gif;
+
+    public bool IsWebPFormatSelected => SelectedAnimatedImageFormat == AnimatedImageFormatOption.WebP;
+
+    /// <summary>
+    /// False when WebP lossless mode is enabled: <c>-lossless 1</c> takes no
+    /// <c>-quality</c> flag, mirroring <see cref="IsAudioBitrateFieldVisible"/>'s
+    /// show/hide precedent for a mode-dependent numeric field.
+    /// </summary>
+    public bool IsWebPQualitySectionVisible => IsWebPFormatSelected && !IsWebPLosslessEnabled;
+
+    /// <summary>
+    /// False while Animated Image export mode is selected: animated-image
+    /// export has no "Manual duration" concept, so "Seamless loop" is forced
+    /// on and its checkbox locked (disabled, not hidden — the user still
+    /// sees it's active and why) rather than exposing a mode that would
+    /// always fail validation.
+    /// </summary>
+    public bool IsSeamlessLoopModeToggleEnabled => !IsAnimatedImageExportModeSelected;
+
+    /// <summary>
+    /// Animated-image export carries no audio track: the Audio card is
+    /// hidden in that mode even when the loaded shader declares an audio
+    /// <c>iChannel</c> (<see cref="HasAudioChannel"/>).
+    /// </summary>
+    public bool IsAudioSectionVisible => HasAudioChannel && IsVideoExportModeSelected;
+
     public IReadOnlyList<ContainerFormatOption> ContainerFormatOptions => ContainerFormatOption.All;
 
     /// <summary>
@@ -392,6 +431,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private bool _isLowSpecModeEnabled;
+
+    /// <summary>
+    /// Top-level toggle between the classic video pipeline
+    /// (<see cref="VideoExportPipeline"/>) and the animated-image pipeline
+    /// (<see cref="AnimatedImageExportPipeline"/>) — the two share no
+    /// settings and are mutually exclusive: exactly one of
+    /// <see cref="ExportVideoCommand"/>/<see cref="ExportAnimatedImageCommand"/>
+    /// is available at a time.
+    /// </summary>
+    [ObservableProperty]
+    private ExportKindOption _selectedExportKind = ExportKindOption.Video;
+
+    [ObservableProperty]
+    private AnimatedImageFormatOption _selectedAnimatedImageFormat = AnimatedImageFormatOption.Gif;
+
+    [ObservableProperty]
+    private int _gifColorCount = 256;
+
+    [ObservableProperty]
+    private GifDitherOption _selectedGifDither = GifDitherOption.FloydSteinberg;
+
+    [ObservableProperty]
+    private int _webPQuality = 80;
+
+    [ObservableProperty]
+    private bool _isWebPLosslessEnabled;
 
     [ObservableProperty]
     private ContainerFormatOption _selectedContainerFormat = ContainerFormatOption.Mp4;
@@ -527,7 +592,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         LocalizationService localizationService,
         MultiPassRenderer previewRenderer,
         IShaderRenderer exportRenderer,
-        VideoExportPipeline exportPipeline)
+        VideoExportPipeline exportPipeline,
+        AnimatedImageExportPipeline animatedImageExportPipeline)
     {
         _shaderFileService = shaderFileService;
         _recentFilesService = recentFilesService;
@@ -538,6 +604,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _previewRenderer = previewRenderer;
         _exportRenderer = exportRenderer;
         _exportPipeline = exportPipeline;
+        _animatedImageExportPipeline = animatedImageExportPipeline;
         _previewClock.LoopDurationSeconds = _loopDurationSeconds;
         _previewClock.TimeChanged += OnPreviewClockTimeChanged;
 
@@ -604,6 +671,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SelectedHardwareEncoder.Value,
             SelectedAudioCodec.Value,
             AudioBitrateKbps);
+
+    /// <summary>
+    /// Builds the effective <see cref="AnimatedImageEncodingOptions"/> from
+    /// the current render settings panel state (GIF color count/dither,
+    /// WebP quality/lossless). Mirrors <see cref="ResolveEncodingOptions"/>'s
+    /// "resolve effective value from panel state" pattern.
+    /// </summary>
+    private AnimatedImageEncodingOptions ResolveAnimatedImageEncodingOptions() =>
+        new(GifColorCount, SelectedGifDither.Value, WebPQuality, IsWebPLosslessEnabled);
 
     /// <summary>
     /// Applies <see cref="SuggestedLoopDurationSeconds"/> to
@@ -791,16 +867,30 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? CoreLoopCalculator.suggestAssistedLoopSeconds(LoopDurationSeconds, frameRate)
             : LoopDurationSeconds;
 
-        var estimatedBytes = CoreFileSizeEstimator.estimateFileSizeBytes(
-            resolution,
-            frameRate,
-            ResolveRateControlMode(),
-            SelectedVideoCodec.Value,
-            ResolveEncodingOptions(),
-            EstimatedTotalFrames,
-            HasAudioChannel && IncludeAudioInExport);
+        if (IsAnimatedImageExportModeSelected)
+        {
+            var estimatedAnimatedImageBytes = CoreAnimatedImageFileSizeEstimator.estimateFileSizeBytes(
+                resolution,
+                frameRate,
+                SelectedAnimatedImageFormat.Value,
+                ResolveAnimatedImageEncodingOptions(),
+                EstimatedTotalFrames);
 
-        EstimatedFileSizeText = CoreFileSizeEstimator.formatEstimatedFileSize(estimatedBytes);
+            EstimatedFileSizeText = CoreAnimatedImageFileSizeEstimator.formatEstimatedFileSize(estimatedAnimatedImageBytes);
+        }
+        else
+        {
+            var estimatedBytes = CoreFileSizeEstimator.estimateFileSizeBytes(
+                resolution,
+                frameRate,
+                ResolveRateControlMode(),
+                SelectedVideoCodec.Value,
+                ResolveEncodingOptions(),
+                EstimatedTotalFrames,
+                HasAudioChannel && IncludeAudioInExport);
+
+            EstimatedFileSizeText = CoreFileSizeEstimator.formatEstimatedFileSize(estimatedBytes);
+        }
 
         // Toute entrée qui affecte le nombre/le contenu des frames rendues
         // (résolution, fps, mode de durée, valeur/unité, frame de fin
@@ -1180,6 +1270,163 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasExportHistory));
     }
 
+    [RelayCommand(CanExecute = nameof(CanExportAnimatedImage))]
+    private async Task ExportAnimatedImageAsync()
+    {
+        if (_loadedShader is null)
+        {
+            return;
+        }
+
+        if (!IsSeamlessLoopModeEnabled)
+        {
+            // Filet de sécurité côté Core/ViewModel : l'UI verrouille déjà
+            // "Boucle parfaite" en mode Image animée (voir
+            // OnSelectedExportKindChanged), mais un preset chargé ou tout
+            // autre chemin programmatique pourrait encore laisser
+            // IsSeamlessLoopModeEnabled à faux.
+            HasExportError = true;
+            ExportErrorSummary = _localizationService.GetString("export.animatedImage.error.manualModeUnsupported");
+            StatusMessage = $"Export failed: {ExportErrorSummary}";
+            ShowToast(
+                ToastSeverity.Error,
+                _localizationService.GetString("toast.export.error.title"),
+                ExportErrorSummary);
+            return;
+        }
+
+        var frameRate = ResolveExportFrameRate();
+        var exportSettings = new AnimatedImageExportSettings(
+            ResolveExportResolution(),
+            frameRate,
+            LoopDurationSeconds,
+            IsLoopEndFrameExclusive,
+            OutputDirectory,
+            OutputFileName,
+            SelectedAnimatedImageFormat.Value,
+            ResolveAnimatedImageEncodingOptions());
+
+        var validationIssues = Videotoy.Core.AnimatedImageExportSettingsValidator.validate(exportSettings);
+        if (!validationIssues.IsEmpty)
+        {
+            HasExportError = true;
+            ExportErrorSummary = Videotoy.Core.AnimatedImageExportSettingsValidator.describeFirstIssue(validationIssues);
+            StatusMessage = $"Export failed: {ExportErrorSummary}";
+            ShowToast(
+                ToastSeverity.Error,
+                _localizationService.GetString("toast.export.error.title"),
+                ExportErrorSummary);
+            return;
+        }
+
+        var outputFilePath = Videotoy.Core.AnimatedImageExportSettingsValidator.resolveOutputFilePath(exportSettings);
+
+        IsExporting = true;
+        ExportCurrentFrame = 0;
+        ExportTotalFrames = 0;
+        ExportProgressPercent = 0.0;
+        ExportRemainingTimeText = string.Empty;
+        HasExportError = false;
+        ExportErrorSummary = string.Empty;
+        StatusMessage = "Exporting...";
+
+        _exportCancellationTokenSource = new CancellationTokenSource();
+        var progress = new Progress<VideoExportProgress>(OnExportProgress);
+
+        var encodingStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var historyResult = ExportHistoryResult.Failed;
+        string? historyErrorSummary = null;
+
+        try
+        {
+            _exportRenderer.Initialize(new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height));
+            _exportRenderer.LoadShader(_loadedShader.HlslPasses["Image"].HlslSource);
+
+            await _animatedImageExportPipeline.RunAsync(exportSettings, progress, _exportCancellationTokenSource.Token);
+
+            historyResult = ExportHistoryResult.Succeeded;
+            StatusMessage = $"Export complete: {outputFilePath}";
+            ShowToast(
+                ToastSeverity.Success,
+                _localizationService.GetString("toast.export.success.title"),
+                outputFilePath);
+        }
+        catch (OperationCanceledException)
+        {
+            historyResult = ExportHistoryResult.Cancelled;
+            StatusMessage = "Export cancelled.";
+        }
+        catch (FfmpegEncodingException ex)
+        {
+            historyResult = ExportHistoryResult.Failed;
+            historyErrorSummary = ex.Diagnosis.Summary;
+            HasExportError = true;
+            ExportErrorSummary = ex.Diagnosis.Summary;
+            StatusMessage = $"Export failed: {ex.Diagnosis.Summary}";
+            ShowToast(
+                ToastSeverity.Error,
+                _localizationService.GetString("toast.export.error.title"),
+                ex.Diagnosis.Summary);
+        }
+        catch (Exception ex)
+        {
+            historyResult = ExportHistoryResult.Failed;
+            historyErrorSummary = ex.Message;
+            HasExportError = true;
+            ExportErrorSummary = ex.Message;
+            StatusMessage = $"Export failed: {ex.Message}";
+            ShowToast(
+                ToastSeverity.Error,
+                _localizationService.GetString("toast.export.error.title"),
+                ex.Message);
+        }
+        finally
+        {
+            encodingStopwatch.Stop();
+            AppendAnimatedImageExportHistoryEntry(exportSettings, outputFilePath, encodingStopwatch.Elapsed, historyResult, historyErrorSummary);
+
+            IsExporting = false;
+            _exportCancellationTokenSource?.Dispose();
+            _exportCancellationTokenSource = null;
+        }
+    }
+
+    private void AppendAnimatedImageExportHistoryEntry(
+        AnimatedImageExportSettings exportSettings,
+        string outputFilePath,
+        TimeSpan encodingDuration,
+        ExportHistoryResult result,
+        string? errorSummary)
+    {
+        var rateControlSummary = exportSettings.Format == AnimatedImageFormat.Gif
+            ? $"{exportSettings.Encoding.GifColorCount} colors, {SelectedGifDither.DisplayName}"
+            : exportSettings.Encoding.WebPLossless
+                ? "Lossless"
+                : $"Quality {exportSettings.Encoding.WebPQuality}";
+
+        var entry = new ExportHistoryEntry
+        {
+            ShaderFilePath = _loadedShaderFilePath ?? string.Empty,
+            ShaderDisplayName = LoadedShaderName,
+            OutputFilePath = outputFilePath,
+            ResolutionWidth = exportSettings.Resolution.Width,
+            ResolutionHeight = exportSettings.Resolution.Height,
+            FrameRateValue = exportSettings.FrameRate.Value,
+            DurationSeconds = exportSettings.LoopSeconds,
+            CodecName = exportSettings.Format == AnimatedImageFormat.Gif ? "GIF" : "WebP",
+            RateControlSummary = rateControlSummary,
+            SpeedPresetName = string.Empty,
+            HardwareEncoderKey = "software",
+            EncodingDuration = encodingDuration,
+            Result = result,
+            ErrorSummary = errorSummary
+        };
+
+        _exportHistoryService.Append(entry);
+        ExportHistory.Insert(0, entry);
+        OnPropertyChanged(nameof(HasExportHistory));
+    }
+
     /// <summary>
     /// Strips characters invalid in a Windows file name from the loaded
     /// shader's title, so it can be used as the default
@@ -1193,7 +1440,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return string.IsNullOrWhiteSpace(sanitized) ? "export" : sanitized;
     }
 
-    private bool CanExportVideo() => IsShaderLoaded && !IsExporting;
+    private bool CanExportVideo() => IsShaderLoaded && !IsExporting && IsVideoExportModeSelected;
+
+    private bool CanExportAnimatedImage() => IsShaderLoaded && !IsExporting && IsAnimatedImageExportModeSelected;
 
     /// <summary>
     /// Turns the first <c>Videotoy.Core.ExportSettingsValidator.ExportSettingsIssue</c>
@@ -1551,14 +1800,57 @@ public sealed partial class MainWindowViewModel : ObservableObject
         TogglePlaybackCommand.NotifyCanExecuteChanged();
         StopPlaybackCommand.NotifyCanExecuteChanged();
         ExportVideoCommand.NotifyCanExecuteChanged();
+        ExportAnimatedImageCommand.NotifyCanExecuteChanged();
         GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsExportingChanged(bool value)
     {
         ExportVideoCommand.NotifyCanExecuteChanged();
+        ExportAnimatedImageCommand.NotifyCanExecuteChanged();
         CancelExportCommand.NotifyCanExecuteChanged();
         GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnSelectedExportKindChanged(ExportKindOption value)
+    {
+        OnPropertyChanged(nameof(IsVideoExportModeSelected));
+        OnPropertyChanged(nameof(IsAnimatedImageExportModeSelected));
+        OnPropertyChanged(nameof(IsSeamlessLoopModeToggleEnabled));
+        OnPropertyChanged(nameof(IsAudioSectionVisible));
+
+        if (value == ExportKindOption.AnimatedImage)
+        {
+            // L'export image animée n'a aucune notion de durée manuelle :
+            // "Boucle parfaite" est verrouillée activée plutôt que
+            // d'exposer un mode qui échouerait systématiquement à la
+            // validation.
+            IsSeamlessLoopModeEnabled = true;
+        }
+
+        ExportVideoCommand.NotifyCanExecuteChanged();
+        ExportAnimatedImageCommand.NotifyCanExecuteChanged();
+        RecalculateExportPreview();
+    }
+
+    partial void OnSelectedAnimatedImageFormatChanged(AnimatedImageFormatOption value)
+    {
+        OnPropertyChanged(nameof(IsGifFormatSelected));
+        OnPropertyChanged(nameof(IsWebPFormatSelected));
+        OnPropertyChanged(nameof(IsWebPQualitySectionVisible));
+        RecalculateExportPreview();
+    }
+
+    partial void OnGifColorCountChanged(int value) => RecalculateExportPreview();
+
+    partial void OnSelectedGifDitherChanged(GifDitherOption value) => RecalculateExportPreview();
+
+    partial void OnWebPQualityChanged(int value) => RecalculateExportPreview();
+
+    partial void OnIsWebPLosslessEnabledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsWebPQualitySectionVisible));
+        RecalculateExportPreview();
     }
 
     partial void OnIsGeneratingLoopSeamPreviewChanged(bool value) => GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
@@ -1685,7 +1977,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnManualDurationValueChanged(double value) => RecalculateExportPreview();
 
-    partial void OnHasAudioChannelChanged(bool value) => RecalculateExportPreview();
+    partial void OnHasAudioChannelChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsAudioSectionVisible));
+        RecalculateExportPreview();
+    }
 
     partial void OnIncludeAudioInExportChanged(bool value) => RecalculateExportPreview();
 

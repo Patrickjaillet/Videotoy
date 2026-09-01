@@ -511,6 +511,15 @@
                         <StackPanel>
                             <TextBlock Text="{loc:Loc Key=panel.renderSettings}" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,16" />
 
+                            <TextBlock Text="{loc:Loc Key=panel.exportKind.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
+                            <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding ExportKindOptions}"
+                                          SelectedItem="{Binding SelectedExportKind}"
+                                          DisplayMemberPath="DisplayName"
+                                          IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                            </Border>
+
                             <TextBlock Text="{loc:Loc Key=panel.resolution.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
                             <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
                                 <StackPanel>
@@ -560,6 +569,7 @@
                                 </StackPanel>
                             </Border>
 
+                            <StackPanel Visibility="{Binding IsVideoExportModeSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Text="{loc:Loc Key=panel.container.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
                             <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
                                 <StackPanel>
@@ -670,6 +680,48 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding IsAnimatedImageExportModeSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="{loc:Loc Key=panel.animatedImage.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
+                                <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                    <StackPanel>
+                                        <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                  ItemsSource="{Binding AnimatedImageFormatOptions}"
+                                                  SelectedItem="{Binding SelectedAnimatedImageFormat}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                        <StackPanel Visibility="{Binding IsGifFormatSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Loc Key=panel.animatedImage.gif.colorCount}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                            <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                     Text="{Binding GifColorCount, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                            <TextBlock Text="{loc:Loc Key=panel.animatedImage.gif.dither}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                            <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                      ItemsSource="{Binding GifDitherOptions}"
+                                                      SelectedItem="{Binding SelectedGifDither}"
+                                                      DisplayMemberPath="DisplayName"
+                                                      IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                        </StackPanel>
+
+                                        <StackPanel Visibility="{Binding IsWebPFormatSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <CheckBox Content="{loc:Loc Key=panel.animatedImage.webp.lossless}"
+                                                      IsChecked="{Binding IsWebPLosslessEnabled}"
+                                                      IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
+                                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                                      Margin="0,10,0,0" />
+                                            <StackPanel Visibility="{Binding IsWebPQualitySectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                <TextBlock Text="{loc:Loc Key=panel.animatedImage.webp.quality}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                         Text="{Binding WebPQuality, UpdateSourceTrigger=PropertyChanged}"
+                                                         IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
 
                             <StackPanel Visibility="{Binding HasCustomUniforms, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Text="{loc:Loc Key=panel.customUniforms.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
@@ -730,12 +782,19 @@
                                     <RadioButton Content="{loc:Loc Key=panel.durationMode.manual}"
                                                  GroupName="DurationMode"
                                                  IsChecked="{Binding IsSeamlessLoopModeEnabled, Converter={StaticResource InverseBooleanConverter}}"
+                                                 IsEnabled="{Binding IsSeamlessLoopModeToggleEnabled}"
                                                  Foreground="{StaticResource TextPrimaryBrush}" />
                                     <RadioButton Content="{loc:Loc Key=panel.durationMode.seamlessLoop}"
                                                  GroupName="DurationMode"
                                                  IsChecked="{Binding IsSeamlessLoopModeEnabled}"
+                                                 IsEnabled="{Binding IsSeamlessLoopModeToggleEnabled}"
                                                  Margin="0,8,0,0"
                                                  Foreground="{StaticResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{loc:Loc Key=panel.durationMode.animatedImageLocked}"
+                                                TextWrapping="Wrap"
+                                                Style="{StaticResource LabelStyle}"
+                                                Margin="0,6,0,0"
+                                                Visibility="{Binding IsAnimatedImageExportModeSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
                                     <Grid Margin="0,12,0,0"
                                           Visibility="{Binding IsSeamlessLoopModeEnabled, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
@@ -1036,7 +1095,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <StackPanel Visibility="{Binding HasAudioChannel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel Visibility="{Binding IsAudioSectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Text="{loc:Loc Key=panel.audio.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
                                 <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
                                     <StackPanel>
@@ -1136,7 +1195,15 @@
                                     Style="{StaticResource PrimaryButtonStyle}"
                                     Command="{Binding ExportVideoCommand}"
                                     HorizontalAlignment="Stretch"
-                                    Margin="0,8,0,0" />
+                                    Margin="0,8,0,0"
+                                    Visibility="{Binding IsVideoExportModeSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                            <Button Content="{loc:Loc Key=action.exportAnimatedImage}"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding ExportAnimatedImageCommand}"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,8,0,0"
+                                    Visibility="{Binding IsAnimatedImageExportModeSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
                     </ScrollViewer>
                 </Border>

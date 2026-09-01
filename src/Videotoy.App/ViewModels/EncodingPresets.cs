@@ -113,3 +113,45 @@ public sealed record AudioCodecOption(string Key, string DisplayName, AudioCodec
     public static IReadOnlyList<AudioCodecOption> AllowedFor(ContainerFormatOption container) =>
         container == ContainerFormatOption.WebM ? [Opus, Copy] : [Aac, Copy];
 }
+
+/// <summary>
+/// Top-level toggle between exporting a classic video file (MP4/WebM/MOV)
+/// and an animated image (GIF/WebP) — the two are structurally distinct
+/// pipelines (<see cref="VideoExportPipeline"/> vs.
+/// <see cref="AnimatedImageExportPipeline"/>) with no shared settings.
+/// </summary>
+public sealed record ExportKindOption(string Key, string DisplayName)
+{
+    public static readonly ExportKindOption Video = new("Video", "Video (MP4/WebM/MOV)");
+    public static readonly ExportKindOption AnimatedImage = new("AnimatedImage", "Animated image (GIF/WebP)");
+
+    public static readonly IReadOnlyList<ExportKindOption> All = [Video, AnimatedImage];
+
+    public static ExportKindOption FromKey(string key) =>
+        All.FirstOrDefault(option => option.Key == key) ?? Video;
+}
+
+public sealed record AnimatedImageFormatOption(string Key, string DisplayName, AnimatedImageFormat Value)
+{
+    public static readonly AnimatedImageFormatOption Gif = new("Gif", "GIF", AnimatedImageFormat.Gif);
+    public static readonly AnimatedImageFormatOption WebP = new("AnimatedWebP", "Animated WebP", AnimatedImageFormat.AnimatedWebP);
+
+    public static readonly IReadOnlyList<AnimatedImageFormatOption> All = [Gif, WebP];
+
+    public static AnimatedImageFormatOption FromKey(string key) =>
+        All.FirstOrDefault(option => option.Key == key) ?? Gif;
+}
+
+public sealed record GifDitherOption(string Key, string DisplayName, GifDitherMode Value)
+{
+    public static readonly GifDitherOption NoDither = new("NoDither", "None", GifDitherMode.NoDither);
+    public static readonly GifDitherOption Bayer = new("Bayer", "Bayer", GifDitherMode.Bayer);
+    public static readonly GifDitherOption FloydSteinberg = new("FloydSteinberg", "Floyd-Steinberg", GifDitherMode.FloydSteinberg);
+    public static readonly GifDitherOption Sierra2 = new("Sierra2", "Sierra2", GifDitherMode.Sierra2);
+    public static readonly GifDitherOption Sierra2_4a = new("Sierra2_4a", "Sierra2 4A", GifDitherMode.Sierra2_4a);
+
+    public static readonly IReadOnlyList<GifDitherOption> All = [NoDither, Bayer, FloydSteinberg, Sierra2, Sierra2_4a];
+
+    public static GifDitherOption FromKey(string key) =>
+        All.FirstOrDefault(option => option.Key == key) ?? FloydSteinberg;
+}

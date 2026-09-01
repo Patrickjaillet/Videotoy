@@ -80,6 +80,7 @@ public partial class App : Application
         services.AddSingleton<MultiPassRenderer>();
         services.AddSingleton<FrameSequenceRenderer>();
         services.AddSingleton<VideoExportPipeline>();
+        services.AddSingleton<AnimatedImageExportPipeline>();
 
         services.AddSingleton<TextureLoader>();
         services.AddSingleton<AudioTrackLoader>();

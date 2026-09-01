@@ -11,8 +11,10 @@
     <Compile Include="Domain.fs" />
     <Compile Include="LoopCalculator.fs" />
     <Compile Include="ExportSettingsValidator.fs" />
+    <Compile Include="AnimatedImageExportSettingsValidator.fs" />
     <Compile Include="ExportProgressEstimator.fs" />
     <Compile Include="ExportFileSizeEstimator.fs" />
+    <Compile Include="AnimatedImageFileSizeEstimator.fs" />
     <Compile Include="UniformBuilder.fs" />
     <Compile Include="ShaderModel.fs" />
     <Compile Include="LoopPeriodDetector.fs" />

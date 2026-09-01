@@ -5,6 +5,21 @@ using Videotoy.Core.Domain;
 
 namespace Videotoy.Ffmpeg;
 
+/// <summary>
+/// Distingue les invocations FFmpeg possibles d'un export image animée.
+/// <see cref="GifPaletteGen"/> et <see cref="GifPaletteUse"/> forment les
+/// deux passes d'un export GIF (génération de la palette optimale, puis
+/// application de cette palette à la séquence ré-rendue) ; <see cref="WebP"/>
+/// est une passe unique (le codec <c>libwebp</c> n'a pas de notion de
+/// palette externe).
+/// </summary>
+public enum AnimatedImagePass
+{
+    GifPaletteGen,
+    GifPaletteUse,
+    WebP
+}
+
 public sealed class FfmpegService
 {
     private readonly FfmpegLocator _locator;
@@ -59,6 +74,47 @@ public sealed class FfmpegService
             options.VideoCodecName,
             cancellationToken).ConfigureAwait(false);
 
+        await LaunchProcessAsync(BuildArguments(options, effectiveVideoCodecName, passNumber)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Démarre le process FFmpeg pour un export image animée (GIF/WebP).
+    /// <paramref name="pass"/> distingue les trois invocations FFmpeg
+    /// possibles : <see cref="AnimatedImagePass.GifPaletteGen"/> et
+    /// <see cref="AnimatedImagePass.GifPaletteUse"/> forment les deux passes
+    /// d'un export GIF (voir <see cref="AnimatedImageExportPipeline"/>, qui
+    /// ré-exécute le rendu de la boucle pour chacune, comme le mode deux
+    /// passes vidéo), <see cref="AnimatedImagePass.WebP"/> est une passe
+    /// unique.
+    /// </summary>
+    public async Task StartAsync(
+        FfmpegAnimatedImageOptions options,
+        AnimatedImagePass pass,
+        CancellationToken cancellationToken = default)
+    {
+        if (IsRunning)
+        {
+            throw new InvalidOperationException("An FFmpeg export is already running.");
+        }
+
+        var outputPath = pass == AnimatedImagePass.GifPaletteGen ? options.PaletteFilePath : options.OutputFilePath;
+        var outputDirectory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        await LaunchProcessAsync(BuildAnimatedImageArguments(options, pass)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Lance <c>ffmpeg.exe</c> avec <paramref name="arguments"/> et prépare
+    /// le pipe stdin/la capture stderr : logique commune extraite des deux
+    /// surcharges <c>StartAsync</c> (export vidéo et export image animée),
+    /// qui ne diffèrent que par la construction de la liste d'arguments.
+    /// </summary>
+    private Task LaunchProcessAsync(IEnumerable<string> arguments)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = _locator.ResolveExecutablePath(),
@@ -68,7 +124,7 @@ public sealed class FfmpegService
             CreateNoWindow = true
         };
 
-        foreach (var argument in BuildArguments(options, effectiveVideoCodecName, passNumber))
+        foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
@@ -84,6 +140,8 @@ public sealed class FfmpegService
         }
 
         _stderrPumpTask = PumpStderrAsync(_process);
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -316,6 +374,73 @@ public sealed class FfmpegService
             }
 
             yield return options.OutputFilePath;
+        }
+    }
+
+    /// <summary>
+    /// Construit la liste d'arguments FFmpeg pour une passe d'export image
+    /// animée. La vidéo brute (BGRA) arrive toujours sur <c>pipe:0</c>
+    /// comme entrée 0, exactement comme pour un export vidéo — seule la
+    /// suite diffère selon <paramref name="pass"/> : <see cref="AnimatedImagePass.GifPaletteGen"/>
+    /// produit uniquement un PNG de palette (<c>palettegen</c>, aucune
+    /// sortie vidéo réelle) ; <see cref="AnimatedImagePass.GifPaletteUse"/>
+    /// relit cette palette comme entrée 1 et applique <c>paletteuse</c> à la
+    /// séquence (ré-rendue depuis le début par
+    /// <see cref="AnimatedImageExportPipeline"/>, comme le mode deux passes
+    /// vidéo) pour produire le GIF final, avec boucle infinie native
+    /// (<c>-loop 0</c>) ; <see cref="AnimatedImagePass.WebP"/> encode
+    /// directement en <c>libwebp</c>, avec boucle infinie native également.
+    /// Aucun des trois n'a de piste audio.
+    /// </summary>
+    private static IEnumerable<string> BuildAnimatedImageArguments(FfmpegAnimatedImageOptions options, AnimatedImagePass pass)
+    {
+        yield return "-y";
+
+        yield return "-f";
+        yield return "rawvideo";
+        yield return "-pix_fmt";
+        yield return "bgra";
+        yield return "-video_size";
+        yield return $"{options.Width}x{options.Height}";
+        yield return "-framerate";
+        yield return options.FrameRate.ToString(CultureInfo.InvariantCulture);
+        yield return "-i";
+        yield return "pipe:0";
+
+        switch (pass)
+        {
+            case AnimatedImagePass.GifPaletteGen:
+                yield return "-vf";
+                yield return $"palettegen=max_colors={options.GifColorCount.ToString(CultureInfo.InvariantCulture)}:stats_mode=diff";
+                yield return options.PaletteFilePath;
+                break;
+
+            case AnimatedImagePass.GifPaletteUse:
+                yield return "-i";
+                yield return options.PaletteFilePath;
+                yield return "-lavfi";
+                yield return $"paletteuse=dither={options.GifDitherName}";
+                yield return "-loop";
+                yield return "0";
+                yield return options.OutputFilePath;
+                break;
+
+            case AnimatedImagePass.WebP:
+                yield return "-c:v";
+                yield return "libwebp";
+                yield return "-lossless";
+                yield return options.WebPLossless ? "1" : "0";
+
+                if (!options.WebPLossless)
+                {
+                    yield return "-quality";
+                    yield return options.WebPQuality.ToString(CultureInfo.InvariantCulture);
+                }
+
+                yield return "-loop";
+                yield return "0";
+                yield return options.OutputFilePath;
+                break;
         }
     }
 

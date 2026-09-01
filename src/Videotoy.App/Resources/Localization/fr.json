@@ -28,6 +28,16 @@
 
   "panel.renderSettings": "Paramètres de rendu",
 
+  "panel.exportKind.sectionLabel": "TYPE D'EXPORT",
+
+  "panel.animatedImage.sectionLabel": "IMAGE ANIMÉE",
+  "panel.animatedImage.gif.colorCount": "Taille de palette (2-256 couleurs)",
+  "panel.animatedImage.gif.dither": "Tramage",
+  "panel.animatedImage.webp.lossless": "Sans perte",
+  "panel.animatedImage.webp.quality": "Qualité (0-100)",
+
+  "panel.durationMode.animatedImageLocked": "L'export en image animée utilise toujours le mode Boucle parfaite.",
+
   "panel.resolution": "Résolution",
   "panel.resolution.sectionLabel": "RÉSOLUTION",
   "panel.resolution.width": "Largeur (px)",
@@ -159,6 +169,8 @@
   "export.error.title": "Échec de l'export",
   "action.cancelExport": "Annuler l'export",
   "action.exportToMp4": "Exporter en MP4",
+  "action.exportAnimatedImage": "Exporter l'image animée",
+  "export.animatedImage.error.manualModeUnsupported": "L'export en image animée nécessite le mode Boucle parfaite.",
 
   "toast.export.success.title": "Export terminé",
   "toast.export.error.title": "Échec de l'export",

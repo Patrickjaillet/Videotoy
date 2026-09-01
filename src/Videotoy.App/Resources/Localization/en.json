@@ -28,6 +28,16 @@
 
   "panel.renderSettings": "Render Settings",
 
+  "panel.exportKind.sectionLabel": "EXPORT TYPE",
+
+  "panel.animatedImage.sectionLabel": "ANIMATED IMAGE",
+  "panel.animatedImage.gif.colorCount": "Palette size (2-256 colors)",
+  "panel.animatedImage.gif.dither": "Dithering",
+  "panel.animatedImage.webp.lossless": "Lossless",
+  "panel.animatedImage.webp.quality": "Quality (0-100)",
+
+  "panel.durationMode.animatedImageLocked": "Animated image export always uses Seamless loop mode.",
+
   "panel.resolution": "Resolution",
   "panel.resolution.sectionLabel": "RESOLUTION",
   "panel.resolution.width": "Width (px)",
@@ -159,6 +169,8 @@
   "export.error.title": "Export failed",
   "action.cancelExport": "Cancel export",
   "action.exportToMp4": "Export to MP4",
+  "action.exportAnimatedImage": "Export animated image",
+  "export.animatedImage.error.manualModeUnsupported": "Animated image export requires Seamless loop mode.",
 
   "toast.export.success.title": "Export complete",
   "toast.export.error.title": "Export failed",

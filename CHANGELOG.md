@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-01
+
+### Added
+
+- Animated image export (GIF, animated WebP), a new pipeline
+  (`AnimatedImageExportPipeline` in `Videotoy.Ffmpeg`) fully parallel to the
+  video export pipeline — no audio, no container/codec concept, constrained
+  to Seamless loop mode (animated images loop by construction)
+- GIF export via FFmpeg's `palettegen`/`paletteuse` two-pass filter chain,
+  with a configurable palette size (2-256 colors) and dithering mode
+  (`None`/`Bayer`/`Floyd-Steinberg`/`Sierra2`/`Sierra2 4A`) — each pass
+  re-renders the loop from scratch (deterministic renderer, same precedent
+  as two-pass H.264/VP9 target-bitrate encoding)
+- Animated WebP export via `libwebp`, with a quality control (0-100) and a
+  lossless toggle, both looping infinitely by format default
+- A new export-kind toggle ("Video (MP4/WebM/MOV)" vs. "Animated image
+  (GIF/WebP)") at the top of the render settings panel: selecting Animated
+  Image hides every video-only card (Container, Encoding, Hardware
+  Encoder, Audio) and locks Seamless loop mode on, with an explanatory
+  message; the existing loop-seam preview (first/last frame side-by-side)
+  is reused as-is to confirm the seam before a GIF/WebP export
+- A dedicated, deliberately coarse file-size estimate for GIF/WebP
+  (`AnimatedImageFileSizeEstimator` in `Videotoy.Core`) — a fundamentally
+  different, content/palette-dependent model from the video estimator's
+  CRF-driven curves
+- `FfmpegService.StartAsync(FfmpegAnimatedImageOptions, AnimatedImagePass, ...)`
+  and `BuildAnimatedImageArguments`, alongside the existing video
+  `StartAsync`, sharing a new common `LaunchProcessAsync` helper
+
+### Changed
+
+- `FfmpegService`'s process-launch logic (start `ffmpeg.exe`, wire stdin/
+  stderr) was extracted from the video-specific `StartAsync` into a private
+  `LaunchProcessAsync` helper, now shared by both the video and
+  animated-image `StartAsync` overloads
+
+### Known limitations
+
+- The GIF/WebP file-size estimate is deliberately coarse — palette-indexed
+  and lossy image compression varies far more with actual pixel content
+  than video CRF curves do, so this is an order-of-magnitude figure, not a
+  calibrated prediction, matching the video estimator's own disclaimer
+- Animated image export has no audio-track concept: GIF and WebP outputs
+  are always silent
+
 ## [1.2.0] - 2026-09-01
 
 ### Added

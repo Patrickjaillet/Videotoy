@@ -130,6 +130,42 @@ type ExportSettings =
       Performance: PerformanceMode
       Encoding: EncodingOptions }
 
+type AnimatedImageFormat =
+    | Gif
+    | AnimatedWebP
+
+/// Mode de tramage (`paletteuse`'s `dither`) appliqué lors de la conversion
+/// vers la palette indexée d'un export GIF ; sans effet pour WebP animé.
+type GifDitherMode =
+    | NoDither
+    | Bayer
+    | FloydSteinberg
+    | Sierra2
+    | Sierra2_4a
+
+type AnimatedImageEncodingOptions =
+    { GifColorCount: int
+      GifDither: GifDitherMode
+      WebPQuality: int
+      WebPLossless: bool }
+
+/// Réglages d'un export image animée (GIF/WebP), volontairement séparés
+/// d'<see cref="ExportSettings"/> plutôt que d'y être fondus : ni audio, ni
+/// conteneur/codec/profil/encodeur matériel n'ont de sens ici, et la durée
+/// est toujours une boucle parfaite (`LoopSeconds`/`ExcludeEndFrame`
+/// stockés directement plutôt que via `DurationMode`, pour que l'absence de
+/// mode "durée manuelle" soit une garantie de type plutôt qu'une simple
+/// contrainte de validation).
+type AnimatedImageExportSettings =
+    { Resolution: Resolution
+      FrameRate: FrameRate
+      LoopSeconds: float
+      ExcludeEndFrame: bool
+      OutputDirectory: string
+      OutputFileName: string
+      Format: AnimatedImageFormat
+      Encoding: AnimatedImageEncodingOptions }
+
 type RenderFrame =
     { Index: int
       TimeSeconds: float
