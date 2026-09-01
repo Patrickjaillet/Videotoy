@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-01
+
+### Added
+
+- New export containers, `WebM` and `MOV`, alongside the existing `MP4`
+  (`ContainerFormat` in `Videotoy.Core.Domain`), each accepting only the
+  codecs that make sense for it (`isCodecAllowedForContainer`): MP4 stays
+  H.264/H.265, MOV adds ProRes, WebM is VP9-only
+- WebM export: VP9 video (constant-quality mode via `-crf`/`-b:v 0`, or
+  target bitrate) and Opus audio, reusing the existing rate-control UI
+- ProRes export (422, 422 HQ, 4444) in a MOV container, selectable via the
+  render settings panel's video profile selector — ProRes has no
+  rate-control, GOP, two-pass or speed-preset concept, so those sections
+  hide automatically when it's selected, as does the hardware encoder
+  section (no hardware ProRes/VP9 support exists)
+- Cross-validation in `ExportSettingsValidator`: codec/container mismatches,
+  VP9's even-width/even-height requirement, and profile/codec mismatches are
+  now rejected before export with a clear message
+- `ExportFileSizeEstimator` gained a structurally separate ProRes estimate
+  (bits-per-pixel-per-frame constants derived from Apple's published
+  reference bitrates), since ProRes's output size is fully determined by
+  profile, not by CRF/bitrate like every other codec here
+- `ExportPreset` gained a `ContainerFormatKey` field so per-format export
+  presets (e.g. a saved "WebM" or "ProRes" configuration) round-trip
+  correctly; older saved presets still load, defaulting to MP4
+
+### Changed
+
+- `FfmpegService.BuildArguments` now branches on container/codec for pixel
+  format (`yuv420p` for H.264/H.265/VP9, `yuv422p10le`/`yuv444p10le` for
+  ProRes), `-movflags +faststart` (MP4/MOV only), and an explicit `-f webm`
+  muxer override (WebM only) — MP4/MOV still rely on FFmpeg's own
+  extension-based muxer detection
+- VP9 encoding speed reuses the existing `EncodingSpeedPreset` selector,
+  translated at the FFmpeg-argument layer to VP9's own `-deadline`/
+  `-cpu-used` idiom instead of x264/x265's `-preset`
+
+### Known limitations
+
+- ProRes 4444's alpha channel is not preserved in this phase: the pipeline's
+  BGRA readback already carries an alpha channel end-to-end, but ProRes 4444
+  export is currently treated as opaque (`yuv444p10le`, no alpha). Full
+  alpha export is deferred to a future phase
+
 ## [1.1.0] - 2026-09-01
 
 ### Added

@@ -2,12 +2,26 @@ using Videotoy.Core.Domain;
 
 namespace Videotoy.App.ViewModels;
 
+public sealed record ContainerFormatOption(string Key, string DisplayName, ContainerFormat Value)
+{
+    public static readonly ContainerFormatOption Mp4 = new("Mp4", "MP4", ContainerFormat.Mp4);
+    public static readonly ContainerFormatOption WebM = new("WebM", "WebM", ContainerFormat.WebM);
+    public static readonly ContainerFormatOption Mov = new("Mov", "MOV", ContainerFormat.Mov);
+
+    public static readonly IReadOnlyList<ContainerFormatOption> All = [Mp4, WebM, Mov];
+
+    public static ContainerFormatOption FromKey(string key) =>
+        All.FirstOrDefault(option => option.Key == key) ?? Mp4;
+}
+
 public sealed record VideoCodecOption(string Key, string DisplayName, VideoCodec Value)
 {
     public static readonly VideoCodecOption H264 = new("H264", "H.264", VideoCodec.H264);
     public static readonly VideoCodecOption H265 = new("H265", "H.265", VideoCodec.H265);
+    public static readonly VideoCodecOption Vp9 = new("Vp9", "VP9", VideoCodec.Vp9);
+    public static readonly VideoCodecOption ProRes = new("ProRes", "Apple ProRes", VideoCodec.ProRes);
 
-    public static readonly IReadOnlyList<VideoCodecOption> All = [H264, H265];
+    public static readonly IReadOnlyList<VideoCodecOption> All = [H264, H265, Vp9, ProRes];
 
     public static VideoCodecOption FromKey(string key) =>
         All.FirstOrDefault(option => option.Key == key) ?? H264;
@@ -36,24 +50,32 @@ public sealed record SpeedPresetOption(string Key, string DisplayName, EncodingS
 /// Preset entry for the video profile combo box, whose available options
 /// depend on the currently selected <see cref="VideoCodecOption"/> — see
 /// <see cref="MainWindowViewModel.VideoProfileOptions"/>, which filters
-/// <see cref="All"/> by <see cref="IsForH265"/>.
+/// <see cref="All"/> by <see cref="CodecKey"/> (matched against
+/// <see cref="VideoCodecOption.Key"/>, or <c>"Any"</c> for
+/// <see cref="None"/>, always included regardless of codec).
 /// </summary>
-public sealed record VideoProfileOption(string Key, string DisplayName, VideoProfile Value, bool IsForH265)
+public sealed record VideoProfileOption(string Key, string DisplayName, VideoProfile Value, string CodecKey)
 {
-    public static readonly VideoProfileOption None = new("None", "Default", VideoProfile.NoProfilePreference, false);
+    public static readonly VideoProfileOption None = new("None", "Default", VideoProfile.NoProfilePreference, "Any");
     public static readonly VideoProfileOption Baseline = new(
-        "Baseline", "Baseline", VideoProfile.NewH264ProfileSelection(H264Profile.BaselineProfile), false);
+        "Baseline", "Baseline", VideoProfile.NewH264ProfileSelection(H264Profile.BaselineProfile), "H264");
     public static readonly VideoProfileOption Main = new(
-        "Main", "Main", VideoProfile.NewH264ProfileSelection(H264Profile.MainProfile), false);
+        "Main", "Main", VideoProfile.NewH264ProfileSelection(H264Profile.MainProfile), "H264");
     public static readonly VideoProfileOption High = new(
-        "High", "High", VideoProfile.NewH264ProfileSelection(H264Profile.HighProfile), false);
+        "High", "High", VideoProfile.NewH264ProfileSelection(H264Profile.HighProfile), "H264");
     public static readonly VideoProfileOption Main265 = new(
-        "Main265", "Main", VideoProfile.NewH265ProfileSelection(H265Profile.MainProfile265), true);
+        "Main265", "Main", VideoProfile.NewH265ProfileSelection(H265Profile.MainProfile265), "H265");
     public static readonly VideoProfileOption Main10 = new(
-        "Main10", "Main 10", VideoProfile.NewH265ProfileSelection(H265Profile.Main10Profile265), true);
+        "Main10", "Main 10", VideoProfile.NewH265ProfileSelection(H265Profile.Main10Profile265), "H265");
+    public static readonly VideoProfileOption ProRes422 = new(
+        "ProRes422", "ProRes 422", VideoProfile.NewProResProfileSelection(ProResProfile.ProResProfile422), "ProRes");
+    public static readonly VideoProfileOption ProRes422Hq = new(
+        "ProRes422Hq", "ProRes 422 HQ", VideoProfile.NewProResProfileSelection(ProResProfile.ProResProfile422Hq), "ProRes");
+    public static readonly VideoProfileOption ProRes4444 = new(
+        "ProRes4444", "ProRes 4444", VideoProfile.NewProResProfileSelection(ProResProfile.ProResProfile4444), "ProRes");
 
     public static readonly IReadOnlyList<VideoProfileOption> All =
-        [None, Baseline, Main, High, Main265, Main10];
+        [None, Baseline, Main, High, Main265, Main10, ProRes422, ProRes422Hq, ProRes4444];
 
     public static VideoProfileOption FromKey(string key) =>
         All.FirstOrDefault(option => option.Key == key) ?? None;
@@ -75,10 +97,19 @@ public sealed record HardwareEncoderOption(string Key, string DisplayName, Hardw
 public sealed record AudioCodecOption(string Key, string DisplayName, AudioCodec Value)
 {
     public static readonly AudioCodecOption Aac = new("Aac", "AAC", AudioCodec.Aac);
+    public static readonly AudioCodecOption Opus = new("Opus", "Opus", AudioCodec.Opus);
     public static readonly AudioCodecOption Copy = new("Copy", "Copy (no re-encode)", AudioCodec.Copy);
 
-    public static readonly IReadOnlyList<AudioCodecOption> All = [Aac, Copy];
+    public static readonly IReadOnlyList<AudioCodecOption> All = [Aac, Opus, Copy];
 
     public static AudioCodecOption FromKey(string key) =>
         All.FirstOrDefault(option => option.Key == key) ?? Aac;
+
+    /// <summary>
+    /// Audio codecs meaningful for <paramref name="container"/>: WebM pairs
+    /// with Opus (its native audio codec), MP4/MOV pair with AAC. Both
+    /// always allow "Copy" (re-use the source track as-is).
+    /// </summary>
+    public static IReadOnlyList<AudioCodecOption> AllowedFor(ContainerFormatOption container) =>
+        container == ContainerFormatOption.WebM ? [Opus, Copy] : [Aac, Copy];
 }

@@ -28,6 +28,7 @@
         <converters:ToastSeverityIconConverter x:Key="ToastSeverityIconConverter" />
         <converters:ExportHistoryResultBrushConverter x:Key="ExportHistoryResultBrushConverter" />
         <converters:ExportHistoryResultTextConverter x:Key="ExportHistoryResultTextConverter" />
+        <converters:ContainerFormatDescriptionConverter x:Key="ContainerFormatDescriptionConverter" />
 
         <Storyboard x:Key="ExpandPanelStoryboard">
             <DoubleAnimation Storyboard.TargetName="SettingsPanelColumn"
@@ -559,6 +560,21 @@
                                 </StackPanel>
                             </Border>
 
+                            <TextBlock Text="{loc:Loc Key=panel.container.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
+                            <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                <StackPanel>
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding ContainerFormatOptions}"
+                                              SelectedItem="{Binding SelectedContainerFormat}"
+                                              DisplayMemberPath="DisplayName"
+                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                    <TextBlock Text="{Binding SelectedContainerFormat, Converter={StaticResource ContainerFormatDescriptionConverter}}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource LabelStyle}"
+                                               Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+
                             <TextBlock Text="{loc:Loc Key=panel.encoding.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
                             <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
                                 <StackPanel>
@@ -569,26 +585,28 @@
                                               DisplayMemberPath="DisplayName"
                                               IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
 
-                                    <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.mode}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
-                                    <CheckBox Content="{loc:Loc Key=panel.encoding.rateControl.targetBitrate}"
-                                              IsChecked="{Binding IsTargetBitrateModeEnabled}"
-                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
-                                              Foreground="{StaticResource TextPrimaryBrush}" />
+                                    <StackPanel Visibility="{Binding IsRateControlSectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.mode}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                        <CheckBox Content="{loc:Loc Key=panel.encoding.rateControl.targetBitrate}"
+                                                  IsChecked="{Binding IsTargetBitrateModeEnabled}"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
+                                                  Foreground="{StaticResource TextPrimaryBrush}" />
 
-                                    <StackPanel Margin="0,10,0,0"
-                                                Visibility="{Binding IsTargetBitrateModeEnabled, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                                        <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.crf.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
-                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
-                                                 Text="{Binding ConstantRateFactorValue, UpdateSourceTrigger=PropertyChanged}"
-                                                 IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
-                                    </StackPanel>
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsTargetBitrateModeEnabled, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.crf.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                            <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                     Text="{Binding ConstantRateFactorValue, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                        </StackPanel>
 
-                                    <StackPanel Margin="0,10,0,0"
-                                                Visibility="{Binding IsTargetBitrateModeEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.targetBitrate.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
-                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
-                                                 Text="{Binding TargetBitrateKbps, UpdateSourceTrigger=PropertyChanged}"
-                                                 IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsTargetBitrateModeEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.targetBitrate.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                            <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                     Text="{Binding TargetBitrateKbps, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                        </StackPanel>
                                     </StackPanel>
 
                                     <TextBlock Text="{loc:Loc Key=panel.encoding.profile}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
@@ -598,52 +616,60 @@
                                               DisplayMemberPath="DisplayName"
                                               IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
 
-                                    <TextBlock Text="{loc:Loc Key=panel.encoding.speed}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
-                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
-                                              ItemsSource="{Binding SpeedPresetOptions}"
-                                              SelectedItem="{Binding SelectedSpeedPreset}"
-                                              DisplayMemberPath="DisplayName"
-                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
-
-                                    <CheckBox Content="{loc:Loc Key=panel.encoding.gop.enable}"
-                                              IsChecked="{Binding IsGopSizeEnabled}"
-                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
-                                              Foreground="{StaticResource TextPrimaryBrush}"
-                                              Margin="0,10,0,0" />
-                                    <StackPanel Margin="0,10,0,0"
-                                                Visibility="{Binding IsGopSizeEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <TextBlock Text="{loc:Loc Key=panel.encoding.gop.value}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
-                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
-                                                 Text="{Binding GopSizeValue, UpdateSourceTrigger=PropertyChanged}"
-                                                 IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                    <StackPanel Visibility="{Binding IsSpeedPresetVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Loc Key=panel.encoding.speed}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                        <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                  ItemsSource="{Binding SpeedPresetOptions}"
+                                                  SelectedItem="{Binding SelectedSpeedPreset}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
                                     </StackPanel>
 
-                                    <CheckBox Content="{loc:Loc Key=panel.encoding.twoPass.enable}"
-                                              IsChecked="{Binding IsTwoPassEnabled}"
-                                              IsEnabled="{Binding IsTargetBitrateModeEnabled}"
-                                              Foreground="{StaticResource TextPrimaryBrush}"
-                                              Margin="0,10,0,0" />
-                                    <TextBlock Text="{loc:Loc Key=panel.encoding.twoPass.description}"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource LabelStyle}"
-                                               Margin="0,6,0,0" />
+                                    <StackPanel Visibility="{Binding IsGopSectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <CheckBox Content="{loc:Loc Key=panel.encoding.gop.enable}"
+                                                  IsChecked="{Binding IsGopSizeEnabled}"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
+                                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                                  Margin="0,10,0,0" />
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsGopSizeEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Loc Key=panel.encoding.gop.value}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                            <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                     Text="{Binding GopSizeValue, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Visibility="{Binding IsTwoPassCheckboxVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <CheckBox Content="{loc:Loc Key=panel.encoding.twoPass.enable}"
+                                                  IsChecked="{Binding IsTwoPassEnabled}"
+                                                  IsEnabled="{Binding IsTargetBitrateModeEnabled}"
+                                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                                  Margin="0,10,0,0" />
+                                        <TextBlock Text="{loc:Loc Key=panel.encoding.twoPass.description}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,6,0,0" />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
 
-                            <TextBlock Text="{loc:Loc Key=panel.hardwareEncoder.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
-                            <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
-                                <StackPanel>
-                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
-                                              ItemsSource="{Binding HardwareEncoderOptions}"
-                                              SelectedItem="{Binding SelectedHardwareEncoder}"
-                                              DisplayMemberPath="DisplayName"
-                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
-                                    <TextBlock Text="{loc:Loc Key=panel.hardwareEncoder.description}"
-                                               TextWrapping="Wrap"
-                                               Style="{StaticResource LabelStyle}"
-                                               Margin="0,6,0,0" />
-                                </StackPanel>
-                            </Border>
+                            <StackPanel Visibility="{Binding IsHardwareEncoderSectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="{loc:Loc Key=panel.hardwareEncoder.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
+                                <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                    <StackPanel>
+                                        <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                  ItemsSource="{Binding HardwareEncoderOptions}"
+                                                  SelectedItem="{Binding SelectedHardwareEncoder}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                        <TextBlock Text="{loc:Loc Key=panel.hardwareEncoder.description}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,6,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
 
                             <StackPanel Visibility="{Binding HasCustomUniforms, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Text="{loc:Loc Key=panel.customUniforms.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />

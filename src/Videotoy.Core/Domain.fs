@@ -20,13 +20,21 @@ type DurationMode =
 type VideoCodec =
     | H264
     | H265
+    | Vp9
+    | ProRes
 
 type RateControlMode =
     | ConstantRateFactor of crf: int
     | TargetBitrate of kilobitsPerSecond: int
 
+/// Conteneur de sortie : chaque conteneur n'accepte qu'un sous-ensemble de
+/// `VideoCodec` (voir `ExportSettingsValidator.isCodecAllowedForContainer`) —
+/// `Mp4` accepte H.264/H.265, `Mov` accepte H.264/H.265/ProRes, `WebM`
+/// n'accepte que VP9.
 type ContainerFormat =
     | Mp4
+    | WebM
+    | Mov
 
 /// Mode de performance de l'export : `Normal` rend aussi vite que le GPU/CPU
 /// le permettent ; `LowSpec` ("petite config") introduit un throttling
@@ -60,12 +68,21 @@ type H265Profile =
     | MainProfile265
     | Main10Profile265
 
+/// Sous-format ProRes : détermine à la fois la qualité/débit (ProRes n'a
+/// aucune notion de CRF/bitrate, voir `ExportSettingsValidator.isRateControlLessCodec`)
+/// et le format de pixel émis (voir `resolvePixelFormatName`).
+type ProResProfile =
+    | ProResProfile422
+    | ProResProfile422Hq
+    | ProResProfile4444
+
 /// Profil d'encodage, dépendant du codec vidéo choisi : un profil H.264 ne
 /// peut pas être appliqué à un export H.265 et inversement. `NoProfilePreference`
 /// laisse l'encodeur choisir son profil par défaut (aucun flag `-profile:v` émis).
 type VideoProfile =
     | H264ProfileSelection of H264Profile
     | H265ProfileSelection of H265Profile
+    | ProResProfileSelection of ProResProfile
     | NoProfilePreference
 
 /// Mode d'encodage bitrate cible : `SinglePass` (une seule passe FFmpeg) ou
@@ -89,6 +106,7 @@ type HardwareEncoderPreference =
 
 type AudioCodec =
     | Aac
+    | Opus
     | Copy
 
 type EncodingOptions =

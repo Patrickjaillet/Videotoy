@@ -51,6 +51,11 @@
   "panel.frameRate.custom": "Custom...",
   "panel.frameRate.custom.label": "Custom FPS",
 
+  "panel.container.sectionLabel": "CONTAINER",
+  "panel.container.description.mp4": "Web delivery, broad compatibility.",
+  "panel.container.description.webm": "Web delivery, open codecs, smaller files.",
+  "panel.container.description.mov": "Professional editing, ProRes workflows.",
+
   "panel.encoding": "Encoding",
   "panel.encoding.sectionLabel": "ENCODING",
   "panel.encoding.codec": "Video codec",

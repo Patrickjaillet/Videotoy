@@ -32,6 +32,12 @@ public static class FfmpegStderrParser
             "The requested export resolution is not compatible with the selected codec."),
         ("Invalid data found when processing input", FfmpegErrorCategory.InvalidInputStream,
             "FFmpeg could not process one of the input streams (corrupted or unsupported data)."),
+        ("only supports even width and height", FfmpegErrorCategory.InvalidResolution,
+            "VP9 requires even width and height for the selected export resolution."),
+        ("Codec not currently supported in container", FfmpegErrorCategory.UnsupportedCodec,
+            "The selected codec cannot be muxed into the selected container."),
+        ("Unable to find a suitable output format", FfmpegErrorCategory.UnsupportedCodec,
+            "FFmpeg could not determine an output format for the selected container/codec combination."),
     };
 
     private const int MaxTailLines = 20;

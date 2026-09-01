@@ -38,7 +38,13 @@ public sealed record FfmpegEncodingOptions(
     bool IsTwoPass,
     string HardwareEncoderKey,
     string AudioCodecName,
-    int AudioBitrateKbps)
+    int AudioBitrateKbps,
+    ContainerFormat Container,
+    string MuxerName,
+    string PixelFormatName,
+    bool SupportsFaststart,
+    bool IsRateControlLess,
+    bool IsIntraOnly)
 {
     public static FfmpegEncodingOptions FromExportSettings(
         ExportSettings settings,
@@ -57,7 +63,13 @@ public sealed record FfmpegEncodingOptions(
         // (TargetBitrate) : en mode CRF, une seule passe suffit déjà à
         // atteindre la qualité demandée, donc TwoPass est silencieusement
         // ramené à SinglePass plutôt que de lever une erreur de validation.
-        var isTwoPass = targetBitrateKbps.HasValue
+        var isIntraOnly = Videotoy.Core.ExportSettingsValidator.isIntraOnlyCodec(settings.Codec);
+
+        // ProRes est intra-only : le mode deux passes n'a structurellement
+        // aucun sens pour lui, indépendamment de ce qu'un preset (éventuellement
+        // enregistré avant ce garde-fou) pourrait encore porter.
+        var isTwoPass = !isIntraOnly
+            && targetBitrateKbps.HasValue
             && Videotoy.Core.ExportSettingsValidator.resolvePassModeIsTwoPass(settings.Encoding.PassMode);
 
         return new FfmpegEncodingOptions(
@@ -76,7 +88,13 @@ public sealed record FfmpegEncodingOptions(
             isTwoPass,
             Videotoy.Core.ExportSettingsValidator.resolveHardwareEncoderPreferenceKey(settings.Encoding.HardwareEncoder),
             Videotoy.Core.ExportSettingsValidator.resolveAudioCodecName(settings.Encoding.AudioCodec),
-            settings.Encoding.AudioBitrateKbps);
+            settings.Encoding.AudioBitrateKbps,
+            settings.Container,
+            Videotoy.Core.ExportSettingsValidator.tryResolveMuxerName(settings.Container),
+            Videotoy.Core.ExportSettingsValidator.resolvePixelFormatName(settings.Codec, settings.Encoding.Profile),
+            Videotoy.Core.ExportSettingsValidator.supportsFaststart(settings.Container),
+            Videotoy.Core.ExportSettingsValidator.isRateControlLessCodec(settings.Codec),
+            isIntraOnly);
     }
 
     private static int? ToNullableInt(System.Nullable<int> value) =>

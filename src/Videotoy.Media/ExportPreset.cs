@@ -75,5 +75,13 @@ public sealed class ExportPreset
 
     public int AudioBitrateKbps { get; init; } = 192;
 
+    /// <summary>
+    /// Container format field added in v1.2.0. Not <c>required</c> so
+    /// presets saved by an older version — before WebM/ProRes support
+    /// existed — still deserialize, defaulting to this phase's previous
+    /// fixed behavior (MP4).
+    /// </summary>
+    public string ContainerFormatKey { get; init; } = "Mp4";
+
     public DateTime SavedUtc { get; init; } = DateTime.UtcNow;
 }

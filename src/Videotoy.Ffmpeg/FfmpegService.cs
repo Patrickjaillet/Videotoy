@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using Videotoy.Core.Domain;
 
 namespace Videotoy.Ffmpeg;
 
@@ -114,7 +115,16 @@ public sealed class FfmpegService
     /// pour un encodage en une seule passe, <c>1</c> ou <c>2</c> pour une
     /// passe du mode deux passes (<see cref="FfmpegEncodingOptions.IsTwoPass"/>) :
     /// la passe 1 n'écrit qu'un fichier de statistiques (sortie <c>NUL</c>,
-    /// sans audio), la passe 2 produit le fichier final.
+    /// sans audio), la passe 2 produit le fichier final. Le format de pixel,
+    /// le flag <c>-movflags +faststart</c> et le muxer explicite (<c>-f</c>)
+    /// dépendent du conteneur/codec sélectionné
+    /// (<see cref="FfmpegEncodingOptions.PixelFormatName"/>/
+    /// <see cref="FfmpegEncodingOptions.SupportsFaststart"/>/
+    /// <see cref="FfmpegEncodingOptions.MuxerName"/>) : MP4/MOV s'appuient sur
+    /// la détection par extension de FFmpeg, seul WebM a besoin d'un <c>-f</c>
+    /// explicite. ProRes n'a ni notion de contrôle de débit
+    /// (<see cref="FfmpegEncodingOptions.IsRateControlLess"/>) ni de GOP/passe
+    /// multiple (<see cref="FfmpegEncodingOptions.IsIntraOnly"/>, intra-only).
     /// </summary>
     private static IEnumerable<string> BuildArguments(
         FfmpegEncodingOptions options,
@@ -165,8 +175,20 @@ public sealed class FfmpegService
         yield return "-c:v";
         yield return effectiveVideoCodecName;
 
-        if (!isHardwareEncoder && !string.IsNullOrEmpty(options.SpeedPreset))
+        var isVp9 = options.Codec == VideoCodec.Vp9;
+
+        if (!isHardwareEncoder && isVp9)
         {
+            // VP9 ne partage pas le vocabulaire de presets x264/x265 :
+            // -deadline/-cpu-used est son équivalent vitesse↔compression.
+            yield return "-deadline";
+            yield return ResolveVp9Deadline(options.SpeedPreset);
+            yield return "-cpu-used";
+            yield return ResolveVp9CpuUsed(options.SpeedPreset).ToString(CultureInfo.InvariantCulture);
+        }
+        else if (!isHardwareEncoder && !options.IsIntraOnly && !string.IsNullOrEmpty(options.SpeedPreset))
+        {
+            // ProRes (intra-only) n'a aucune notion de preset de vitesse.
             yield return "-preset";
             yield return options.SpeedPreset;
         }
@@ -177,45 +199,58 @@ public sealed class FfmpegService
             yield return options.VideoProfileName;
         }
 
-        if (options.GopSize is { } gopSize)
+        if (!options.IsIntraOnly && options.GopSize is { } gopSize)
         {
             yield return "-g";
             yield return gopSize.ToString(CultureInfo.InvariantCulture);
         }
 
-        if (options.ConstantRateFactor is { } crf)
+        if (!options.IsRateControlLess)
         {
-            if (isHardwareEncoder)
+            if (options.ConstantRateFactor is { } crf)
             {
-                if (effectiveVideoCodecName.EndsWith("_qsv", StringComparison.Ordinal))
+                if (isHardwareEncoder)
                 {
-                    yield return "-global_quality";
+                    if (effectiveVideoCodecName.EndsWith("_qsv", StringComparison.Ordinal))
+                    {
+                        yield return "-global_quality";
+                        yield return crf.ToString(CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        // NVENC / AMF : équivalent qualité constante de -crf.
+                        yield return "-rc";
+                        yield return "constqp";
+                        yield return "-qp";
+                        yield return crf.ToString(CultureInfo.InvariantCulture);
+                    }
+                }
+                else if (isVp9)
+                {
+                    // Mode "qualité constante" documenté de libvpx : -b:v 0
+                    // désactive le plafond de débit par défaut de VP9 pour que
+                    // -crf seul pilote la qualité.
+                    yield return "-crf";
                     yield return crf.ToString(CultureInfo.InvariantCulture);
+                    yield return "-b:v";
+                    yield return "0";
                 }
                 else
                 {
-                    // NVENC / AMF : équivalent qualité constante de -crf.
-                    yield return "-rc";
-                    yield return "constqp";
-                    yield return "-qp";
+                    yield return "-crf";
                     yield return crf.ToString(CultureInfo.InvariantCulture);
                 }
             }
-            else
+            else if (options.TargetBitrateKbps is { } kbps)
             {
-                yield return "-crf";
-                yield return crf.ToString(CultureInfo.InvariantCulture);
+                // -b:v est reconnu uniformément par x264/x265/VP9 et par les
+                // trois familles d'encodeurs matériels.
+                yield return "-b:v";
+                yield return $"{kbps}k";
             }
         }
-        else if (options.TargetBitrateKbps is { } kbps)
-        {
-            // -b:v est reconnu uniformément par x264/x265 et par les trois
-            // familles d'encodeurs matériels.
-            yield return "-b:v";
-            yield return $"{kbps}k";
-        }
 
-        if (options.IsTwoPass && passNumber is { } pass)
+        if (!options.IsIntraOnly && options.IsTwoPass && passNumber is { } pass)
         {
             yield return "-pass";
             yield return pass.ToString(CultureInfo.InvariantCulture);
@@ -224,7 +259,7 @@ public sealed class FfmpegService
         }
 
         yield return "-pix_fmt";
-        yield return "yuv420p";
+        yield return options.PixelFormatName;
         yield return "-r";
         yield return frameRateText;
 
@@ -254,8 +289,11 @@ public sealed class FfmpegService
             yield return "-shortest";
         }
 
-        yield return "-movflags";
-        yield return "+faststart";
+        if (options.SupportsFaststart)
+        {
+            yield return "-movflags";
+            yield return "+faststart";
+        }
 
         if (isFirstPass)
         {
@@ -268,9 +306,51 @@ public sealed class FfmpegService
         }
         else
         {
+            if (!string.IsNullOrEmpty(options.MuxerName))
+            {
+                // Seul WebM a besoin d'un muxer explicite : MP4/MOV sont déjà
+                // correctement déduits par FFmpeg à partir de l'extension du
+                // chemin de sortie.
+                yield return "-f";
+                yield return options.MuxerName;
+            }
+
             yield return options.OutputFilePath;
         }
     }
+
+    /// <summary>
+    /// Traduit un <see cref="EncodingSpeedPreset"/> x264/x265 vers l'idiome
+    /// <c>-deadline</c> de VP9 : les presets rapides ciblent le mode temps
+    /// réel, les autres restent en <c>good</c> avec un <c>-cpu-used</c>
+    /// décroissant (voir <see cref="ResolveVp9CpuUsed"/>) pour approfondir
+    /// la compression.
+    /// </summary>
+    private static string ResolveVp9Deadline(string speedPresetName) => speedPresetName switch
+    {
+        "ultrafast" or "superfast" or "veryfast" => "realtime",
+        _ => "good"
+    };
+
+    /// <summary>
+    /// Traduit un <see cref="EncodingSpeedPreset"/> x264/x265 vers le
+    /// <c>-cpu-used</c> de VP9 (0 = le plus lent/le plus compressé, 8 = le
+    /// plus rapide), l'axe vitesse↔compression réel de libvpx-vp9 au sein
+    /// d'un même <c>-deadline</c>.
+    /// </summary>
+    private static int ResolveVp9CpuUsed(string speedPresetName) => speedPresetName switch
+    {
+        "ultrafast" => 8,
+        "superfast" => 7,
+        "veryfast" => 6,
+        "faster" => 5,
+        "fast" => 4,
+        "medium" => 3,
+        "slow" => 2,
+        "slower" => 1,
+        "veryslow" => 0,
+        _ => 3
+    };
 
     public async Task WriteFrameAsync(byte[] pixelsBgra, CancellationToken cancellationToken = default)
     {

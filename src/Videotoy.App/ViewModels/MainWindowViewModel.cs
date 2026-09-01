@@ -296,24 +296,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public IReadOnlyList<FrameRatePresetOption> FrameRatePresets => FrameRatePresetOption.All;
 
-    public IReadOnlyList<VideoCodecOption> VideoCodecOptions => VideoCodecOption.All;
+    public IReadOnlyList<ContainerFormatOption> ContainerFormatOptions => ContainerFormatOption.All;
+
+    /// <summary>
+    /// Video codec options applicable to <see cref="SelectedContainerFormat"/>,
+    /// per <see cref="Videotoy.Core.ExportSettingsValidator.isCodecAllowedForContainer"/>
+    /// (the single source of truth for the container↔codec matrix — never
+    /// duplicated here).
+    /// </summary>
+    public IReadOnlyList<VideoCodecOption> VideoCodecOptions =>
+        VideoCodecOption.All
+            .Where(option => Videotoy.Core.ExportSettingsValidator.isCodecAllowedForContainer(SelectedContainerFormat.Value, option.Value))
+            .ToList();
 
     public IReadOnlyList<SpeedPresetOption> SpeedPresetOptions => SpeedPresetOption.All;
 
     /// <summary>
     /// Video profile options applicable to <see cref="SelectedVideoCodec"/>:
-    /// <see cref="VideoProfileOption.None"/> plus either the H.264 or the
-    /// H.265 profile entries, never both — an H.264 profile cannot be
-    /// applied to an H.265 export and vice versa.
+    /// <see cref="VideoProfileOption.None"/> plus whichever codec-specific
+    /// profile entries match <see cref="SelectedVideoCodec"/>'s key.
     /// </summary>
     public IReadOnlyList<VideoProfileOption> VideoProfileOptions =>
         VideoProfileOption.All
-            .Where(option => option == VideoProfileOption.None || option.IsForH265 == (SelectedVideoCodec == VideoCodecOption.H265))
+            .Where(option => option == VideoProfileOption.None || option.CodecKey == SelectedVideoCodec.Key)
             .ToList();
 
     public IReadOnlyList<HardwareEncoderOption> HardwareEncoderOptions => HardwareEncoderOption.All;
 
-    public IReadOnlyList<AudioCodecOption> AudioCodecOptions => AudioCodecOption.All;
+    public IReadOnlyList<AudioCodecOption> AudioCodecOptions => AudioCodecOption.AllowedFor(SelectedContainerFormat);
 
     /// <summary>
     /// False for <see cref="AudioCodecOption.Copy"/>, which re-uses the
@@ -322,6 +332,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// accepts no <c>-b:a</c> flag).
     /// </summary>
     public bool IsAudioBitrateFieldVisible => SelectedAudioCodec != AudioCodecOption.Copy;
+
+    /// <summary>
+    /// ProRes (<see cref="VideoCodecOption.ProRes"/>) has no rate-control
+    /// concept: its output size is fully determined by profile, not by a
+    /// quality/bitrate flag — the CRF/target-bitrate section is hidden
+    /// entirely for it rather than shown disabled.
+    /// </summary>
+    public bool IsRateControlSectionVisible => SelectedVideoCodec != VideoCodecOption.ProRes;
+
+    /// <summary>ProRes is intra-only: no GOP-size concept.</summary>
+    public bool IsGopSectionVisible => SelectedVideoCodec != VideoCodecOption.ProRes;
+
+    /// <summary>ProRes is intra-only: no multi-pass concept.</summary>
+    public bool IsTwoPassCheckboxVisible => SelectedVideoCodec != VideoCodecOption.ProRes;
+
+    /// <summary>ProRes has no encoding-speed-preset concept.</summary>
+    public bool IsSpeedPresetVisible => SelectedVideoCodec != VideoCodecOption.ProRes;
+
+    /// <summary>
+    /// No hardware encoder support exists for VP9/ProRes in this pipeline —
+    /// the whole "Hardware encoder" section is hidden for them rather than
+    /// left visible with a dead software-only choice.
+    /// </summary>
+    public bool IsHardwareEncoderSectionVisible =>
+        SelectedVideoCodec == VideoCodecOption.H264 || SelectedVideoCodec == VideoCodecOption.H265;
 
     private RateControlMode ResolveRateControlMode() =>
         IsTargetBitrateModeEnabled
@@ -357,6 +392,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private bool _isLowSpecModeEnabled;
+
+    [ObservableProperty]
+    private ContainerFormatOption _selectedContainerFormat = ContainerFormatOption.Mp4;
 
     [ObservableProperty]
     private VideoCodecOption _selectedVideoCodec = VideoCodecOption.H264;
@@ -638,6 +676,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             LoopDurationSeconds = LoopDurationSeconds,
             IsLoopEndFrameExclusive = IsLoopEndFrameExclusive,
             IsLowSpecModeEnabled = IsLowSpecModeEnabled,
+            ContainerFormatKey = SelectedContainerFormat.Key,
             VideoCodecKey = SelectedVideoCodec.Key,
             IsTargetBitrateModeEnabled = IsTargetBitrateModeEnabled,
             TargetBitrateKbps = TargetBitrateKbps,
@@ -690,6 +729,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         LoopDurationSeconds = preset.LoopDurationSeconds;
         IsLoopEndFrameExclusive = preset.IsLoopEndFrameExclusive;
         IsLowSpecModeEnabled = preset.IsLowSpecModeEnabled;
+        SelectedContainerFormat = ContainerFormatOption.FromKey(preset.ContainerFormatKey);
         SelectedVideoCodec = VideoCodecOption.FromKey(preset.VideoCodecKey);
         IsTargetBitrateModeEnabled = preset.IsTargetBitrateModeEnabled;
         TargetBitrateKbps = preset.TargetBitrateKbps;
@@ -1005,7 +1045,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             OutputFileName,
             SelectedVideoCodec.Value,
             ResolveRateControlMode(),
-            ContainerFormat.Mp4,
+            SelectedContainerFormat.Value,
             IsLowSpecModeEnabled
                 ? PerformanceMode.NewLowSpec(LowSpecThrottleMillisecondsPerFrame)
                 : PerformanceMode.Normal,
@@ -1540,14 +1580,54 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnCustomFrameRateValueChanged(double value) => RecalculateExportPreview();
 
+    partial void OnSelectedContainerFormatChanged(ContainerFormatOption value)
+    {
+        // Le codec sélectionné peut ne plus être autorisé dans le nouveau
+        // conteneur (ex. VP9 n'existe qu'en WebM) : on retombe alors sur le
+        // premier codec valide plutôt que de laisser une combinaison
+        // conteneur/codec incohérente. Le changement de codec (s'il a lieu)
+        // déclenche déjà, via OnSelectedVideoCodecChanged, la réinitialisation
+        // en cascade du profil et de l'encodeur matériel.
+        OnPropertyChanged(nameof(VideoCodecOptions));
+
+        if (!VideoCodecOptions.Contains(SelectedVideoCodec))
+        {
+            SelectedVideoCodec = VideoCodecOptions[0];
+        }
+
+        OnPropertyChanged(nameof(AudioCodecOptions));
+
+        if (!AudioCodecOptions.Contains(SelectedAudioCodec))
+        {
+            SelectedAudioCodec = AudioCodecOptions[0];
+        }
+
+        RecalculateExportPreview();
+    }
+
     partial void OnSelectedVideoCodecChanged(VideoCodecOption value)
     {
-        // Un profil H.264 ne peut pas s'appliquer à un export H.265 et
+        // Un profil H.264 ne peut pas s'appliquer à un export H.265/ProRes et
         // inversement : changer de codec réinitialise toujours le profil
         // sélectionné vers "Default" plutôt que de laisser une combinaison
         // codec/profil incohérente.
         SelectedVideoProfile = VideoProfileOption.None;
         OnPropertyChanged(nameof(VideoProfileOptions));
+
+        // Aucun encodeur matériel n'existe pour VP9/ProRes dans ce pipeline :
+        // retombe silencieusement sur "Software" plutôt que de conserver une
+        // préférence matérielle sans effet.
+        if (value != VideoCodecOption.H264 && value != VideoCodecOption.H265)
+        {
+            SelectedHardwareEncoder = HardwareEncoderOption.Software;
+        }
+
+        OnPropertyChanged(nameof(IsRateControlSectionVisible));
+        OnPropertyChanged(nameof(IsGopSectionVisible));
+        OnPropertyChanged(nameof(IsTwoPassCheckboxVisible));
+        OnPropertyChanged(nameof(IsSpeedPresetVisible));
+        OnPropertyChanged(nameof(IsHardwareEncoderSectionVisible));
+
         RecalculateExportPreview();
     }
 

@@ -26,6 +26,8 @@ let private codecEfficiencyFactor (codec: VideoCodec) : float =
     match codec with
     | H264 -> 1.0
     | H265 -> 0.5
+    | Vp9 -> 0.55
+    | ProRes -> 1.0 // Unused by the ProRes estimate path; present for match exhaustiveness only.
 
 /// Coarse, qualitative efficiency multiplier for the encoding speed preset:
 /// faster presets (`UltraFast`) trade compression efficiency for speed, so
@@ -53,7 +55,23 @@ let private profileEfficiencyFactor (profile: VideoProfile) : float =
     | H264ProfileSelection HighProfile -> 0.95
     | H265ProfileSelection MainProfile265 -> 1.0
     | H265ProfileSelection Main10Profile265 -> 1.05
+    | ProResProfileSelection _ -> 1.0 // Unused by the ProRes estimate path; present for match exhaustiveness only.
     | NoProfilePreference -> 1.0
+
+/// ProRes bits-per-pixel-per-frame constants, derived from Apple's published
+/// reference bitrates at 1920x1080/29.97fps (147/220/330 Mbps for
+/// 422/422 HQ/4444 respectively), normalized to pixels so the estimate scales
+/// with any resolution/frame rate. ProRes has no CRF/bitrate concept: its
+/// output size is fully determined by resolution, frame rate and profile —
+/// this is a fundamentally different, non-quality-driven estimate from
+/// `bitsPerPixelForCrf`.
+let private proResBitsPerPixel (profile: VideoProfile) : float =
+    let referencePixelsPerSecond = 1920.0 * 1080.0 * 29.97
+    match profile with
+    | ProResProfileSelection ProResProfile422 -> 147_000_000.0 / referencePixelsPerSecond
+    | ProResProfileSelection ProResProfile422Hq -> 220_000_000.0 / referencePixelsPerSecond
+    | ProResProfileSelection ProResProfile4444 -> 330_000_000.0 / referencePixelsPerSecond
+    | _ -> 147_000_000.0 / referencePixelsPerSecond
 
 /// Estimates the exported file's size in bytes for the given settings and
 /// total frame count. In `ConstantRateFactor` mode, the baseline
@@ -81,15 +99,19 @@ let estimateFileSizeBytes
         let pixelsPerFrame = float (resolution.Width * resolution.Height)
 
         let videoBitsPerSecond =
-            match rateControl with
-            | TargetBitrate kbps -> float kbps * 1000.0
-            | ConstantRateFactor crf ->
-                let bitsPerPixel = bitsPerPixelForCrf crf
-                let baseline = bitsPerPixel * pixelsPerFrame * frameRate.Value
-                baseline
-                * codecEfficiencyFactor codec
-                * speedPresetEfficiencyFactor encoding.Speed
-                * profileEfficiencyFactor encoding.Profile
+            match codec with
+            | ProRes ->
+                proResBitsPerPixel encoding.Profile * pixelsPerFrame * frameRate.Value
+            | H264 | H265 | Vp9 ->
+                match rateControl with
+                | TargetBitrate kbps -> float kbps * 1000.0
+                | ConstantRateFactor crf ->
+                    let bitsPerPixel = bitsPerPixelForCrf crf
+                    let baseline = bitsPerPixel * pixelsPerFrame * frameRate.Value
+                    baseline
+                    * codecEfficiencyFactor codec
+                    * speedPresetEfficiencyFactor encoding.Speed
+                    * profileEfficiencyFactor encoding.Profile
 
         let audioBps = if includeAudio then float encoding.AudioBitrateKbps * 1000.0 else 0.0
         let totalBitsPerSecond = videoBitsPerSecond + audioBps
