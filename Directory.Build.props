@@ -11,9 +11,9 @@
     <Company>Patrick JAILLET</Company>
     <Product>Videotoy</Product>
     <Copyright>Copyright © 2026 Patrick JAILLET</Copyright>
-    <VersionPrefix>1.6.0</VersionPrefix>
-    <FileVersion>1.6.0.0</FileVersion>
-    <AssemblyVersion>1.6.0.0</AssemblyVersion>
-    <InformationalVersion>1.6.0</InformationalVersion>
+    <VersionPrefix>1.7.0</VersionPrefix>
+    <FileVersion>1.7.0.0</FileVersion>
+    <AssemblyVersion>1.7.0.0</AssemblyVersion>
+    <InformationalVersion>1.7.0</InformationalVersion>
   </PropertyGroup>
 </Project>

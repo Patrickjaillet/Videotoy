@@ -31,6 +31,35 @@ This produces `tools/ffmpeg/ffmpeg.exe.sha256`, which is tracked in source
 control (unlike `ffmpeg.exe` itself) and must be regenerated whenever the
 embedded `ffmpeg.exe` binary is updated.
 
+## Embedding Tint (optional, WGSL support)
+
+Unlike FFmpeg, embedding Tint is **entirely optional**. Videotoy builds and
+runs fine without it — GLSL and native HLSL shaders are unaffected. Only
+opening a `.wgsl` file requires it, and its absence surfaces as a normal
+error in the "Shader Issues" panel rather than a startup failure.
+
+To enable WGSL support, place a Windows build of `tint.exe` (the WGSL
+frontend/backend CLI from the Dawn project) at:
+
+```
+tools/tint/tint.exe
+```
+
+This file is intentionally excluded from source control (see `.gitignore`)
+due to its size, same as `ffmpeg.exe`. Then generate its expected SHA-256
+hash file:
+
+```
+powershell -ExecutionPolicy Bypass -File tools/tint/generate-hash.ps1
+```
+
+This produces `tools/tint/tint.exe.sha256`, tracked in source control, and
+must be regenerated whenever the embedded `tint.exe` binary is updated. See
+`tools/tint/README.md` for details, including a note on the exact CLI
+invocation assumption made by `WgslTranspilerProcess` (`Videotoy.Transpiler`)
+— verify it against the actual binary obtained, since it could not be
+confirmed without network access at the time this was written.
+
 ## Building from the command line
 
 ```

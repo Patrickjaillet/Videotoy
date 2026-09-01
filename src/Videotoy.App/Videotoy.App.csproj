@@ -14,6 +14,7 @@
     <ProjectReference Include="..\Videotoy.Rendering\Videotoy.Rendering.csproj" />
     <ProjectReference Include="..\Videotoy.Ffmpeg\Videotoy.Ffmpeg.csproj" />
     <ProjectReference Include="..\Videotoy.Media\Videotoy.Media.csproj" />
+    <ProjectReference Include="..\Videotoy.Transpiler\Videotoy.Transpiler.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,6 +43,14 @@
     <None Include="..\..\tools\ffmpeg\ffmpeg.exe.sha256" Condition="Exists('..\..\tools\ffmpeg\ffmpeg.exe.sha256')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>tools\ffmpeg\ffmpeg.exe.sha256</Link>
+    </None>
+    <None Include="..\..\tools\tint\tint.exe" Condition="Exists('..\..\tools\tint\tint.exe')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>tools\tint\tint.exe</Link>
+    </None>
+    <None Include="..\..\tools\tint\tint.exe.sha256" Condition="Exists('..\..\tools\tint\tint.exe.sha256')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>tools\tint\tint.exe.sha256</Link>
     </None>
   </ItemGroup>
 

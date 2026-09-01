@@ -20,7 +20,7 @@ namespace Videotoy.App.ViewModels;
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private static readonly string[] OpenFileDialogExtensions =
-        { "*.glsl", "*.frag", "*.json", "*.shadertoy" };
+        { "*.glsl", "*.frag", "*.wgsl", "*.hlsl", "*.hlsli", "*.json", "*.shadertoy" };
 
     private readonly ShaderFileService _shaderFileService;
     private readonly RecentFilesService _recentFilesService;
@@ -80,11 +80,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private WriteableBitmap? _previewBitmap;
     private LoadedShader? _loadedShader;
     private string? _loadedShaderFilePath;
+    private bool _suppressShaderLanguageOverride;
     private bool _isScrubbing;
     private CancellationTokenSource? _exportCancellationTokenSource;
 
     [ObservableProperty]
     private string _statusMessage = "Idle";
+
+    public IReadOnlyList<ShaderLanguageOption> ShaderLanguageOptions { get; } = ShaderLanguageOption.All;
+
+    /// <summary>
+    /// Langage détecté (ou forcé manuellement) du shader actuellement
+    /// chargé — reflète toujours <c>_loadedShader.Project.SourceLanguage</c>.
+    /// Piloté par <see cref="LoadShaderFile"/> et
+    /// <see cref="ForceShaderLanguageAsync"/> (Phase v1.7.0).
+    /// </summary>
+    [ObservableProperty]
+    private ShaderLanguageOption _selectedShaderLanguage = ShaderLanguageOption.Glsl;
 
     [ObservableProperty]
     private int _currentFrame;
@@ -2099,6 +2111,67 @@ public sealed partial class MainWindowViewModel : ObservableObject
             : remaining.ToString(@"mm\:ss");
     }
 
+    /// <summary>
+    /// Sélection manuelle d'un langage dans la barre de statut (Phase
+    /// v1.7.0) : ré-exécute la validation/transpilation avec le langage
+    /// forcé, sans relire le fichier ni recharger les assets. Ignoré quand
+    /// la propriété est mise à jour programmatiquement par
+    /// <see cref="LoadShaderFile"/> lui-même (voir
+    /// <see cref="_suppressShaderLanguageOverride"/>) — sans quoi chaque
+    /// chargement de fichier redéclencherait inutilement ce chemin.
+    /// </summary>
+    partial void OnSelectedShaderLanguageChanged(ShaderLanguageOption value)
+    {
+        if (_suppressShaderLanguageOverride || _loadedShader is null)
+        {
+            return;
+        }
+
+        ForceShaderLanguage(value.Value);
+    }
+
+    private void ForceShaderLanguage(Videotoy.Core.ShaderModel.ShaderSourceLanguage language)
+    {
+        if (_loadedShader is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var reloaded = _shaderFileService.ReloadWithLanguageOverride(_loadedShader, language);
+
+            ShaderIssues.Clear();
+            foreach (var issue in reloaded.Issues)
+            {
+                ShaderIssues.Add(ShaderIssueViewModel.FromIssue(issue));
+            }
+
+            IsIssuesPanelOpen = ShaderIssues.Count > 0;
+
+            StatusMessage = reloaded.HasErrors
+                ? $"Loaded '{LoadedShaderName}' with errors."
+                : $"Loaded '{LoadedShaderName}'.";
+
+            if (!reloaded.HasErrors)
+            {
+                InitializePreview(reloaded);
+                HasAudioChannel = ResolveExportAudioSourceFilePath(reloaded) is not null;
+                IncludeAudioInExport = true;
+            }
+            else
+            {
+                HasAudioChannel = false;
+                CustomUniformGroups.Clear();
+                HasCustomUniforms = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to apply shader language override: {ex.Message}";
+        }
+    }
+
     public void LoadShaderFile(string filePath)
     {
         if (!ShaderFileService.IsSupportedShaderFile(filePath))
@@ -2114,6 +2187,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             var loadedShader = _shaderFileService.Load(filePath);
             _loadedShaderFilePath = filePath;
+
+            _suppressShaderLanguageOverride = true;
+            SelectedShaderLanguage = ShaderLanguageOption.FromLanguage(loadedShader.Project.SourceLanguage);
+            _suppressShaderLanguageOverride = false;
 
             ShaderIssues.Clear();
             foreach (var issue in loadedShader.Issues)

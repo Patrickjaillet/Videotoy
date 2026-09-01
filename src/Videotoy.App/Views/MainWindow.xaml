@@ -199,6 +199,21 @@
                                Style="{StaticResource LabelStyle}"
                                VerticalAlignment="Center" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{loc:Loc Key=statusBar.shaderLanguage.label}"
+                                   Style="{StaticResource LabelStyle}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,4,0"
+                                   Visibility="{Binding IsShaderLoaded, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <ComboBox ItemsSource="{Binding ShaderLanguageOptions}"
+                                  SelectedItem="{Binding SelectedShaderLanguage}"
+                                  DisplayMemberPath="DisplayName"
+                                  ToolTip="{loc:Loc Key=statusBar.shaderLanguage.tooltip}"
+                                  FontSize="11"
+                                  Padding="4,0"
+                                  MinWidth="0"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,16,0"
+                                  Visibility="{Binding IsShaderLoaded, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <TextBlock Text="{loc:LocFormat Key=statusBar.currentFrame, Path=CurrentFrame}"
                                    Style="{StaticResource LabelStyle}"
                                    Margin="0,0,16,0" />

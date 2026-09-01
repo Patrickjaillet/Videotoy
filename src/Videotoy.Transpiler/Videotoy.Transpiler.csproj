@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Videotoy.Transpiler</RootNamespace>
+    <AssemblyName>Videotoy.Transpiler</AssemblyName>
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Videotoy.Core\Videotoy.Core.fsproj" />
+  </ItemGroup>
+
+</Project>

@@ -7,6 +7,7 @@ using Videotoy.App.ViewModels;
 using Videotoy.Ffmpeg;
 using Videotoy.Media;
 using Videotoy.Rendering;
+using Videotoy.Transpiler;
 
 namespace Videotoy.App;
 
@@ -90,6 +91,17 @@ public partial class App : Application
         services.AddSingleton(sp => new FrameSequenceRenderer(sp.GetRequiredService<ExportMultiPassRenderer>()));
         services.AddSingleton<VideoExportPipeline>();
         services.AddSingleton<AnimatedImageExportPipeline>();
+
+        services.AddSingleton<TintLocator>();
+        // Contrairement à FfmpegIntegrityVerifier, VerifyOrThrow() n'est
+        // jamais appelé au démarrage : le support WGSL est optionnel, la
+        // vérification est paresseuse (voir WgslToHlslTranspiler, premier
+        // chargement d'un fichier .wgsl) et son échec ne doit jamais faire
+        // planter l'application.
+        services.AddSingleton<TintIntegrityVerifier>();
+        services.AddSingleton<WgslTranspilerProcess>();
+        services.AddSingleton<WgslToHlslTranspiler>();
+        services.AddSingleton<IShaderTranspilerRouter, ShaderTranspilerRouter>();
 
         services.AddSingleton<TextureLoader>();
         services.AddSingleton<AudioTrackLoader>();

@@ -18,3 +18,9 @@ installer/Output/
 !/tools/ffmpeg/ffmpeg.exe.sha256
 !/tools/ffmpeg/generate-hash.ps1
 !/tools/ffmpeg/README.md
+
+/tools/tint/*
+!/tools/tint/.gitkeep
+!/tools/tint/tint.exe.sha256
+!/tools/tint/generate-hash.ps1
+!/tools/tint/README.md

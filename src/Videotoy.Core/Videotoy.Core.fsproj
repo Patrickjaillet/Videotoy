@@ -17,12 +17,16 @@
     <Compile Include="AnimatedImageFileSizeEstimator.fs" />
     <Compile Include="UniformBuilder.fs" />
     <Compile Include="ShaderModel.fs" />
+    <Compile Include="ShaderLanguageDetector.fs" />
     <Compile Include="VideoTimeMapping.fs" />
     <Compile Include="LoopPeriodDetector.fs" />
     <Compile Include="PassGraph.fs" />
     <Compile Include="ShaderValidator.fs" />
     <Compile Include="CustomUniformParser.fs" />
+    <Compile Include="HlslBoilerplate.fs" />
+    <Compile Include="ShaderTranspiler.fs" />
     <Compile Include="GlslToHlslTranspiler.fs" />
+    <Compile Include="HlslNativeTranspiler.fs" />
     <Compile Include="ShadertoyJsonParser.fs" />
   </ItemGroup>
 

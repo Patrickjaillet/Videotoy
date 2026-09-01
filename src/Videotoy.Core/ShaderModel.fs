@@ -1,5 +1,26 @@
 module Videotoy.Core.ShaderModel
 
+/// Langage source d'un projet shader — détecté à l'ouverture du fichier
+/// (voir `ShaderLanguageDetector`) ou forcé manuellement par l'utilisateur.
+/// Un seul langage par projet : les projets JSON/Shadertoy multi-passes
+/// restent toujours Glsl (aucun mélange de langage entre passes).
+type ShaderSourceLanguage =
+    | Glsl
+    | Wgsl
+    | Hlsl
+
+/// Fonction-frontière : convertit `ShaderSourceLanguage` en une simple
+/// clé `string` ("Glsl"/"Wgsl"/"Hlsl") consommable en toute sécurité par du
+/// C# (le filtrage direct d'une union discriminée F# depuis C# est fragile
+/// — sa représentation compilée n'est pas un contrat stable — voir
+/// CLAUDE.md). Utilisé par `ShaderTranspilerRouter` (Videotoy.App) pour
+/// dispatcher vers l'implémentation de transpileur adéquate.
+let languageKey (language: ShaderSourceLanguage) : string =
+    match language with
+    | Glsl -> "Glsl"
+    | Wgsl -> "Wgsl"
+    | Hlsl -> "Hlsl"
+
 type ChannelInputType =
     | Texture
     | Buffer
@@ -29,7 +50,8 @@ type ShaderProject =
       BufferB: ShaderPass option
       BufferC: ShaderPass option
       BufferD: ShaderPass option
-      SourceFilePath: string }
+      SourceFilePath: string
+      SourceLanguage: ShaderSourceLanguage }
 
 type IssueSeverity =
     | Warning
@@ -63,7 +85,7 @@ let emptyPass (name: string) (sourceCode: string) : ShaderPass =
       Channel2 = None
       Channel3 = None }
 
-let fromRawSource (sourceCode: string) (filePath: string) : ShaderProject =
+let fromRawSource (sourceCode: string) (filePath: string) (sourceLanguage: ShaderSourceLanguage) : ShaderProject =
     let title =
         match System.IO.Path.GetFileNameWithoutExtension(filePath) with
         | null -> "untitled"
@@ -75,7 +97,16 @@ let fromRawSource (sourceCode: string) (filePath: string) : ShaderProject =
       BufferB = None
       BufferC = None
       BufferD = None
-      SourceFilePath = filePath }
+      SourceFilePath = filePath
+      SourceLanguage = sourceLanguage }
+
+/// Copie `project` avec un langage source différent — utilisé par la
+/// substitution manuelle de langage (voir
+/// `MainWindowViewModel.ForceShaderLanguageAsync`/`ShaderFileService.ReloadWithLanguageOverride`)
+/// pour re-router la validation/transpilation sans recharger le fichier ni
+/// les assets, qui ne dépendent pas du langage.
+let withSourceLanguage (language: ShaderSourceLanguage) (project: ShaderProject) : ShaderProject =
+    { project with SourceLanguage = language }
 
 let allPasses (project: ShaderProject) : ShaderPass list =
     [ Some project.ImagePass; project.BufferA; project.BufferB; project.BufferC; project.BufferD ]

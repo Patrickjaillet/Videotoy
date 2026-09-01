@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace Videotoy.Media;
 
@@ -17,7 +18,7 @@ public sealed class LoadedShader
 
     public required IReadOnlyDictionary<string, Videotoy.Ffmpeg.VideoTextureSource> VideoSources { get; init; }
 
-    public required IReadOnlyDictionary<string, Videotoy.Core.GlslToHlslTranspiler.TranspileResult> HlslPasses { get; init; }
+    public required IReadOnlyDictionary<string, Videotoy.Core.ShaderTranspiler.TranspileResult> HlslPasses { get; init; }
 
     public bool HasErrors => Issues.Any(issue => issue.IsErrorIssue);
 }
@@ -25,20 +26,23 @@ public sealed class LoadedShader
 public sealed class ShaderFileService
 {
     private static readonly string[] JsonExtensions = { ".json", ".shadertoy" };
-    private static readonly string[] RawExtensions = { ".glsl", ".frag" };
+    private static readonly string[] RawExtensions = { ".glsl", ".frag", ".wgsl", ".hlsl", ".hlsli" };
 
     private readonly TextureLoader _textureLoader;
     private readonly AudioTrackLoader _audioTrackLoader;
     private readonly Videotoy.Ffmpeg.VideoTextureLoader _videoTextureLoader;
+    private readonly IShaderTranspilerRouter _transpilerRouter;
 
     public ShaderFileService(
         TextureLoader textureLoader,
         AudioTrackLoader audioTrackLoader,
-        Videotoy.Ffmpeg.VideoTextureLoader videoTextureLoader)
+        Videotoy.Ffmpeg.VideoTextureLoader videoTextureLoader,
+        IShaderTranspilerRouter transpilerRouter)
     {
         _textureLoader = textureLoader;
         _audioTrackLoader = audioTrackLoader;
         _videoTextureLoader = videoTextureLoader;
+        _transpilerRouter = transpilerRouter;
     }
 
     public static bool IsSupportedShaderFile(string filePath)
@@ -65,28 +69,61 @@ public sealed class ShaderFileService
             else
             {
                 issues.AddRange(result.ErrorValue);
-                project = Videotoy.Core.ShaderModel.fromRawSource(string.Empty, filePath);
+                project = Videotoy.Core.ShaderModel.fromRawSource(string.Empty, filePath, Videotoy.Core.ShaderModel.ShaderSourceLanguage.Glsl);
             }
         }
         else if (RawExtensions.Contains(extension))
         {
             var sourceCode = File.ReadAllText(filePath);
-            project = Videotoy.Core.ShaderModel.fromRawSource(sourceCode, filePath);
+            var detectedLanguage = Videotoy.Core.ShaderLanguageDetector.detect(filePath, sourceCode);
+            project = Videotoy.Core.ShaderModel.fromRawSource(sourceCode, filePath, detectedLanguage);
         }
         else
         {
             throw new NotSupportedException($"Unsupported shader file extension: '{extension}'.");
         }
 
+        return BuildLoadedShader(project, issues);
+    }
+
+    /// <summary>
+    /// Reconstruit un <see cref="LoadedShader"/> avec un langage source forcé
+    /// manuellement par l'utilisateur (voir <c>MainWindowViewModel.ForceShaderLanguageAsync</c>),
+    /// sans relire le fichier depuis le disque ni recharger les assets
+    /// (textures/audio/vidéo) — seules la validation et la transpilation
+    /// dépendent du langage, donc seules elles sont ré-exécutées.
+    /// </summary>
+    public LoadedShader ReloadWithLanguageOverride(LoadedShader previousLoad, Videotoy.Core.ShaderModel.ShaderSourceLanguage overrideLanguage)
+    {
+        var project = Videotoy.Core.ShaderModel.withSourceLanguage(overrideLanguage, previousLoad.Project);
+        var issues = new List<Videotoy.Core.ShaderModel.ShaderIssue>();
+
+        var reloaded = BuildLoadedShader(project, issues);
+
+        return new LoadedShader
+        {
+            Project = reloaded.Project,
+            Issues = reloaded.Issues,
+            Textures = previousLoad.Textures,
+            AudioTracks = previousLoad.AudioTracks,
+            VideoSources = previousLoad.VideoSources,
+            HlslPasses = reloaded.HlslPasses
+        };
+    }
+
+    private LoadedShader BuildLoadedShader(Videotoy.Core.ShaderModel.ShaderProject project, List<Videotoy.Core.ShaderModel.ShaderIssue> issues)
+    {
         issues.AddRange(Videotoy.Core.ShaderValidator.validateProject(project));
 
-        var hlslPasses = Videotoy.Core.GlslToHlslTranspiler.transpileProject(project);
+        var hlslPasses = _transpilerRouter.TranspileProjectAsync(project, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
         foreach (var pair in hlslPasses)
         {
             issues.AddRange(pair.Value.Diagnostics);
         }
 
-        var baseDirectory = Path.GetDirectoryName(filePath) ?? string.Empty;
+        var baseDirectory = Path.GetDirectoryName(project.SourceFilePath) ?? string.Empty;
         var textures = new Dictionary<string, TextureAsset>(StringComparer.OrdinalIgnoreCase);
         var audioTracks = new Dictionary<string, AudioTrack>(StringComparer.OrdinalIgnoreCase);
         var videoSources = new Dictionary<string, Videotoy.Ffmpeg.VideoTextureSource>(StringComparer.OrdinalIgnoreCase);

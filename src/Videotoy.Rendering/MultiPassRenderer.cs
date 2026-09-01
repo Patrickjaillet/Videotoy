@@ -182,7 +182,7 @@ public class MultiPassRenderer : IDisposable
     public void Initialize(
         RenderTargetSize size,
         Core.ShaderModel.ShaderProject project,
-        IReadOnlyDictionary<string, Core.GlslToHlslTranspiler.TranspileResult> hlslPasses,
+        IReadOnlyDictionary<string, Core.ShaderTranspiler.TranspileResult> hlslPasses,
         IReadOnlyDictionary<string, BoundImageAsset>? images = null,
         IReadOnlyDictionary<string, BoundAudioAsset>? audioTracks = null,
         IReadOnlyDictionary<string, BoundVideoAsset>? videoSources = null)
@@ -253,13 +253,13 @@ public class MultiPassRenderer : IDisposable
     /// d'un shader précédent ne survivent jamais au chargement d'un autre.
     /// </summary>
     private void InitializeCustomUniforms(
-        IReadOnlyDictionary<string, Core.GlslToHlslTranspiler.TranspileResult> hlslPasses)
+        IReadOnlyDictionary<string, Core.ShaderTranspiler.TranspileResult> hlslPasses)
     {
         _customUniformsBuffer?.Dispose();
         _customUniformsBuffer = null;
         _customUniformValues.Clear();
 
-        var declarations = Core.GlslToHlslTranspiler.projectCustomUniformsOf(hlslPasses.Values)
+        var declarations = Core.ShaderTranspiler.projectCustomUniformsOf(hlslPasses.Values)
             .ToArray();
 
         _customUniformDeclarations = declarations;
@@ -287,7 +287,7 @@ public class MultiPassRenderer : IDisposable
 
     private void BuildPassGraph(
         Core.ShaderModel.ShaderProject project,
-        IReadOnlyDictionary<string, Core.GlslToHlslTranspiler.TranspileResult> hlslPasses)
+        IReadOnlyDictionary<string, Core.ShaderTranspiler.TranspileResult> hlslPasses)
     {
         DisposeSlots();
 
@@ -320,7 +320,7 @@ public class MultiPassRenderer : IDisposable
 
             var pixelShaderBytecode = Compiler.Compile(
                 transpileResult.HlslSource,
-                "PSMain",
+                transpileResult.EntryPoint,
                 $"videotoy-ps-{passName}",
                 "ps_5_0",
                 CompileFlags);

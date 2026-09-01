@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-01
+
+### Added
+
+- Multi-language shader support: GLSL (existing), native HLSL, and WGSL
+  (via a vendored, optional `tint.exe`), with automatic language detection
+  on file open — by extension first, falling back to a syntax-marker
+  heuristic for ambiguous files (e.g. a `.txt` dropped on the viewport)
+- `IShaderTranspiler` abstraction generalizing the former
+  GLSL-only `GlslToHlslTranspiler`: one implementation per source language
+  targeting the HLSL the D3D11 renderer already consumes, sharing the
+  GPU-boilerplate emission (`ShadertoyUniforms`/`iChannel*` declarations)
+  and the `mainImage`-to-`PSMain` entry-point convention
+- Native HLSL path: validates and compiles user-authored HLSL directly
+  (still requires a `mainImage`-shaped entry function, so every language
+  participates in the same fixed channel/register-binding layout)
+- Per-language `ShaderValidator` rules (entry-point conventions, reserved
+  declarations for native HLSL, stray-directive warnings), sharing the
+  existing delimiter-balance check across all three languages
+- A status bar language indicator with a manual override control, letting
+  the user correct a wrong detection without reloading the file from disk
+- `.wgsl`/`.hlsl`/`.hlsli` added to the "File > Open" dialog filter and
+  drag-and-drop recognition
+
+### Known limitations
+
+- WGSL support is optional and best-effort: it requires manually vendoring
+  `tools/tint/tint.exe` (see `COMPILATION.md`), is verified lazily on first
+  use rather than at startup, and never blocks the app if absent — a
+  missing/corrupt binary surfaces as a Shader Issues error on that file only
+- The exact `tint.exe` CLI invocation used by `WgslTranspilerProcess` is an
+  unverified assumption (no network access at implementation time) and may
+  need adjustment against the actual binary obtained
+- One language per shader project: Shadertoy JSON multi-pass projects stay
+  entirely GLSL — mixing languages across Image/Buffer A-D passes within a
+  single project is not supported
+
 ## [1.6.0] - 2026-09-01
 
 ### Added

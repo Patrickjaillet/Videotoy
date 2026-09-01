@@ -17,6 +17,8 @@
   "viewport.shaderLoaded.previewPending": "La prévisualisation sera disponible dans une future version",
   "viewport.timeline.currentTime": "{0:0.00}s",
 
+  "statusBar.shaderLanguage.label": "Langage",
+  "statusBar.shaderLanguage.tooltip": "Langage source détecté du shader — cliquer pour corriger si la détection est erronée.",
   "statusBar.currentFrame": "Frame {0}",
   "statusBar.currentFps": "{0:0.0} IPS",
   "statusBar.frameCount.label": "Frame ",

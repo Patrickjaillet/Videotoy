@@ -4,10 +4,7 @@ open System.Text
 open System.Text.RegularExpressions
 open Videotoy.Core.ShaderModel
 
-type TranspileResult =
-    { HlslSource: string
-      Diagnostics: ShaderIssue list
-      CustomUniforms: Videotoy.Core.CustomUniformParser.CustomUniformDeclaration list }
+open Videotoy.Core.ShaderTranspiler
 
 let private constructorRegex =
     Regex(@"\bvec2\s*\(", RegexOptions.Compiled)
@@ -111,9 +108,6 @@ let private textureCallRegex =
 let private discardRegex =
     Regex(@"\bdiscard\s*;", RegexOptions.Compiled)
 
-let private mainImageSignatureRegex =
-    Regex(@"void\s+mainImage\s*\(\s*out\s+float4\s+(\w+)\s*,\s*(?:in\s+)?float2\s+(\w+)\s*\)\s*\{", RegexOptions.Compiled)
-
 let private stripCStyleComments (source: string) : string =
     let noBlockComments = Regex.Replace(source, @"/\*.*?\*/", "", RegexOptions.Singleline)
     Regex.Replace(noBlockComments, @"//[^\n]*", "")
@@ -187,77 +181,6 @@ let private initializeUnassignedLocals (source: string) : string =
 
             sprintf "%s %s;" typeName rewrittenIdentifiers)
 
-let private renameMainImage (source: string) : string * string * string =
-    let currentMatch = mainImageSignatureRegex.Match(source)
-
-    if currentMatch.Success then
-        let outputVar = currentMatch.Groups.[1].Value
-        let coordVar = currentMatch.Groups.[2].Value
-        let rewritten =
-            mainImageSignatureRegex.Replace(
-                source,
-                sprintf "float4 PSMain(float4 __svPosition : SV_Position) : SV_Target\n{\n    float4 %s = float4(0, 0, 0, 0);\n    float2 %s = float2(__svPosition.x, iResolution.y - __svPosition.y);" outputVar coordVar,
-                1)
-        rewritten, outputVar, coordVar
-    else
-        source, "fragColor", "fragCoord"
-
-let private appendReturnStatement (source: string) (outputVar: string) : string =
-    let trimmedEnd = source.TrimEnd()
-    if trimmedEnd.EndsWith("}") then
-        let lastBraceIndex = trimmedEnd.LastIndexOf('}')
-        let body = trimmedEnd.Substring(0, lastBraceIndex)
-        sprintf "%s    return %s;\n}\n" body outputVar
-    else
-        source
-
-let private shadertoyUniformCBuffer =
-    """cbuffer ShadertoyUniforms : register(b0)
-{
-    float3 iResolution;
-    float iTime;
-    float iTimeDelta;
-    int iFrame;
-    float iSampleRate;
-    float __padding0;
-    float4 iMouse;
-    float4 iDate;
-    float4 iChannelResolution[4];
-};
-
-"""
-
-let private channelDeclarations () : string =
-    [ 0 .. 3 ]
-    |> List.map (fun index ->
-        sprintf
-            "Texture2D iChannel%d : register(t%d);\nSamplerState iChannel%dSampler : register(s%d);\n"
-            index index index index)
-    |> String.concat ""
-
-let private hlslTypeName (uniformType: Videotoy.Core.CustomUniformParser.CustomUniformType) : string =
-    match uniformType with
-    | Videotoy.Core.CustomUniformParser.Float -> "float"
-    | Videotoy.Core.CustomUniformParser.Vec2 -> "float2"
-    | Videotoy.Core.CustomUniformParser.Vec3 -> "float3"
-    | Videotoy.Core.CustomUniformParser.Vec4 -> "float4"
-
-/// Génère le `cbuffer` HLSL (register b1) déclarant chaque uniform custom
-/// détecté par `CustomUniformParser`, dans l'ordre de détection, avec un
-/// padding explicite pour respecter l'alignement 16 octets attendu par
-/// `CustomUniformsBuffer` côté C#. Vide si le shader n'expose aucun uniform
-/// custom : aucun `cbuffer` supplémentaire n'est alors émis.
-let private customUniformsCBuffer (declarations: Videotoy.Core.CustomUniformParser.CustomUniformDeclaration list) : string =
-    if List.isEmpty declarations then
-        ""
-    else
-        let fields =
-            declarations
-            |> List.map (fun declaration -> sprintf "    %s %s;" (hlslTypeName declaration.UniformType) declaration.Name)
-            |> String.concat "\n"
-
-        sprintf "cbuffer CustomUniforms : register(b1)\n{\n%s\n}\n\n" fields
-
 let transpilePass (commonCode: string option) (pass: ShaderPass) : TranspileResult =
     let diagnostics = ResizeArray<ShaderIssue>()
 
@@ -278,13 +201,13 @@ let transpilePass (commonCode: string option) (pass: ShaderPass) : TranspileResu
         |> applyFunctionReplacements
         |> initializeUnassignedLocals
 
-    let renamed, outputVar, _coordVar = renameMainImage preprocessed
+    let renamed, outputVar, _coordVar = Videotoy.Core.HlslBoilerplate.renameMainImage preprocessed
 
     let hlslBody =
         renamed
         |> applyTextureCalls
         |> applyDiscard
-        |> fun source -> appendReturnStatement source outputVar
+        |> fun source -> Videotoy.Core.HlslBoilerplate.appendReturnStatement source outputVar
 
     if constructorRegex.IsMatch(pass.SourceCode) |> not && not (rawSource.Contains("mainImage")) then
         diagnostics.Add(warningIssue pass.Name 1 "No 'vec2' constructors detected: pass may be empty or non-standard.")
@@ -292,16 +215,10 @@ let transpilePass (commonCode: string option) (pass: ShaderPass) : TranspileResu
     let customUniformDeclarations =
         Videotoy.Core.CustomUniformParser.parseDeclarations pass.Name rawSource
 
-    let hlslSource =
-        StringBuilder()
-            .Append(shadertoyUniformCBuffer)
-            .Append(customUniformsCBuffer customUniformDeclarations)
-            .Append(channelDeclarations ())
-            .Append("\n")
-            .Append(hlslBody)
-            .ToString()
+    let hlslSource = Videotoy.Core.HlslBoilerplate.prependBoilerplate customUniformDeclarations hlslBody
 
     { HlslSource = hlslSource
+      EntryPoint = "PSMain"
       Diagnostics = diagnostics |> List.ofSeq
       CustomUniforms = customUniformDeclarations }
 
@@ -309,22 +226,3 @@ let transpileProject (project: ShaderProject) : Map<string, TranspileResult> =
     allPasses project
     |> List.map (fun pass -> pass.Name, transpilePass project.CommonCode pass)
     |> Map.ofList
-
-/// Union dédupliquée (par nom) des uniforms custom exposés par l'ensemble des
-/// passes déjà transpilées d'un projet, dans un ordre stable de première
-/// apparition. Accepte directement les `TranspileResult` (sans transiter par
-/// la `Map` F#) pour rester trivialement appelable depuis C#/.NET, où seules
-/// les valeurs d'un `IReadOnlyDictionary` sont disponibles. Utilisée pour
-/// construire dynamiquement les sliders du panneau de paramètres de rendu
-/// sans reparser le GLSL.
-let projectCustomUniformsOf (hlslPasses: TranspileResult seq) : Videotoy.Core.CustomUniformParser.CustomUniformDeclaration list =
-    hlslPasses
-    |> Seq.collect (fun result -> result.CustomUniforms)
-    |> Seq.distinctBy (fun declaration -> declaration.Name)
-    |> List.ofSeq
-
-let projectCustomUniforms (hlslPasses: Map<string, TranspileResult>) : Videotoy.Core.CustomUniformParser.CustomUniformDeclaration list =
-    hlslPasses
-    |> Map.toList
-    |> List.map snd
-    |> projectCustomUniformsOf

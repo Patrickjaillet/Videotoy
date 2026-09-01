@@ -139,7 +139,8 @@ let parse (jsonText: string) (filePath: string) : Result<ShaderProject, ShaderIs
                       BufferB = bufferPass "B"
                       BufferC = bufferPass "C"
                       BufferD = bufferPass "D"
-                      SourceFilePath = filePath }
+                      SourceFilePath = filePath
+                      SourceLanguage = Videotoy.Core.ShaderModel.Glsl }
     with
     | :? JsonException as ex ->
         Result.Error [ errorIssue "Image" 1 (sprintf "Malformed Shadertoy JSON export: %s" ex.Message) ]
