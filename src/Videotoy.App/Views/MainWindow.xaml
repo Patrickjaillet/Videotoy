@@ -4,6 +4,7 @@
         xmlns:vm="clr-namespace:Videotoy.App.ViewModels"
         xmlns:converters="clr-namespace:Videotoy.App.Converters"
         xmlns:loc="clr-namespace:Videotoy.App.Localization"
+        xmlns:media="clr-namespace:Videotoy.Media;assembly=Videotoy.Media"
         Title="{loc:Loc Key=app.title}"
         Icon="pack://application:,,,/Assets/Icons/app.ico"
         Width="1180"
@@ -29,6 +30,8 @@
         <converters:ExportHistoryResultBrushConverter x:Key="ExportHistoryResultBrushConverter" />
         <converters:ExportHistoryResultTextConverter x:Key="ExportHistoryResultTextConverter" />
         <converters:ContainerFormatDescriptionConverter x:Key="ContainerFormatDescriptionConverter" />
+        <converters:RenderQueueItemStatusBrushConverter x:Key="RenderQueueItemStatusBrushConverter" />
+        <converters:RenderQueueItemStatusTextConverter x:Key="RenderQueueItemStatusTextConverter" />
 
         <Storyboard x:Key="ExpandPanelStoryboard">
             <DoubleAnimation Storyboard.TargetName="SettingsPanelColumn"
@@ -155,6 +158,7 @@
                                     </MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="{loc:Loc Key=export.history.panel.title}" Command="{Binding ToggleExportHistoryPanelCommand}" />
+                                <MenuItem Header="{loc:Loc Key=renderQueue.panel.title}" Command="{Binding ToggleRenderQueuePanelCommand}" />
                             </MenuItem>
                             <MenuItem Header="{loc:Loc Key=menu.help}">
                                 <MenuItem Header="{loc:Loc Key=menu.help.about}" Click="OnAboutClicked">
@@ -308,6 +312,194 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <Border DockPanel.Dock="Bottom"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    MaxHeight="320"
+                    Visibility="{Binding IsRenderQueuePanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <DockPanel LastChildFill="True">
+                    <Grid DockPanel.Dock="Top" Margin="14,8,14,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{loc:Loc Key=renderQueue.panel.title}" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleRenderQueuePanelCommand}" ToolTip="{loc:Loc Key=renderQueue.panel.toggle.collapse}">
+                            <Path Data="{StaticResource IconClose}" Style="{StaticResource VectorIconStyle}" Width="11" Height="11" />
+                        </Button>
+                    </Grid>
+
+                    <Grid DockPanel.Dock="Top" Margin="14,0,14,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0"
+                                Content="{loc:Loc Key=renderQueue.add.video}"
+                                Command="{Binding AddCurrentToRenderQueueCommand}"
+                                CommandParameter="{x:Static media:RenderQueueItemKind.Video}"
+                                Margin="0,0,6,0" />
+                        <Button Grid.Column="1"
+                                Content="{loc:Loc Key=renderQueue.add.animatedImage}"
+                                Command="{Binding AddCurrentToRenderQueueCommand}"
+                                CommandParameter="{x:Static media:RenderQueueItemKind.AnimatedImage}"
+                                Margin="0,0,6,0" />
+
+                        <Button Grid.Column="3"
+                                Style="{StaticResource IconButtonStyle}"
+                                Command="{Binding StartRenderQueueCommand}"
+                                ToolTip="{loc:Loc Key=renderQueue.start}"
+                                Visibility="{Binding IsRenderQueueRunning, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                            <Path Data="{StaticResource IconPlay}" Style="{StaticResource VectorIconStyle}" Width="12" Height="12" />
+                        </Button>
+                        <Button Grid.Column="3"
+                                Style="{StaticResource IconButtonStyle}"
+                                Command="{Binding PauseRenderQueueCommand}"
+                                ToolTip="{loc:Loc Key=renderQueue.pause}"
+                                Visibility="{Binding IsRenderQueueRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Path Data="{StaticResource IconPause}" Style="{StaticResource VectorIconStyle}" Width="12" Height="12" />
+                        </Button>
+                        <Button Grid.Column="4"
+                                Content="{loc:Loc Key=renderQueue.resume}"
+                                Command="{Binding ResumeRenderQueueCommand}"
+                                Visibility="{Binding IsRenderQueuePaused, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Margin="6,0,0,0" />
+                        <Button Grid.Column="5"
+                                Style="{StaticResource IconButtonStyle}"
+                                Command="{Binding CancelRenderQueueCommand}"
+                                ToolTip="{loc:Loc Key=renderQueue.cancelAll}"
+                                Margin="6,0,0,0">
+                            <Path Data="{StaticResource IconClose}" Style="{StaticResource VectorIconStyle}" Width="11" Height="11" />
+                        </Button>
+                    </Grid>
+
+                    <Grid DockPanel.Dock="Top"
+                          Margin="14,0,14,8"
+                          Visibility="{Binding IsRenderQueueRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Style="{StaticResource LabelStyle}">
+                            <Run Text="{loc:Loc Key=renderQueue.progress.overallLabel}" />
+                            <Run Text=" " />
+                            <Run Text="{Binding RenderQueueCurrentItemIndex, Mode=OneWay}" />
+                            <Run Text="/" />
+                            <Run Text="{Binding RenderQueueTotalItemCount, Mode=OneWay}" />
+                        </TextBlock>
+                        <ProgressBar Grid.Row="1"
+                                     Style="{StaticResource ExportProgressBarStyle}"
+                                     Value="{Binding RenderQueueOverallProgressPercent, Mode=OneWay}"
+                                     Margin="0,4,0,0" />
+                    </Grid>
+
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="{loc:Loc Key=renderQueue.empty}"
+                               Style="{StaticResource LabelStyle}"
+                               Margin="14,4,14,10"
+                               Visibility="{Binding HasRenderQueueItems, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="14,0,14,10">
+                        <ListBox x:Name="RenderQueueListBox"
+                                 ItemsSource="{Binding RenderQueue}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 AllowDrop="True"
+                                 PreviewMouseLeftButtonDown="OnRenderQueueItemPreviewMouseLeftButtonDown"
+                                 PreviewMouseMove="OnRenderQueueItemPreviewMouseMove"
+                                 Drop="OnRenderQueueItemDrop">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0,4" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Setter Property="Focusable" Value="False" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <ContentPresenter />
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource CardBorderStyle}" Padding="8" Cursor="SizeAll">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Grid.Column="0"
+                                                    Width="64"
+                                                    Height="36"
+                                                    Background="{StaticResource ViewportBackgroundBrush}"
+                                                    Margin="0,0,10,0">
+                                                <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                           Text="{Binding ShaderDisplayName, Mode=OneWay}" />
+                                                <TextBlock FontSize="11"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           Text="{Binding OutputFileName, Mode=OneWay}" />
+                                                <ProgressBar Style="{StaticResource ExportProgressBarStyle}"
+                                                             Value="{Binding ProgressPercent, Mode=OneWay}"
+                                                             Height="4"
+                                                             Margin="0,4,0,0"
+                                                             Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            </StackPanel>
+
+                                            <TextBlock Grid.Column="2"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Margin="8,0"
+                                                       Foreground="{Binding Status, Converter={StaticResource RenderQueueItemStatusBrushConverter}}"
+                                                       Text="{Binding Status, Converter={StaticResource RenderQueueItemStatusTextConverter}}" />
+
+                                            <Button Grid.Column="3"
+                                                    Style="{StaticResource IconButtonStyle}"
+                                                    Command="{Binding DataContext.CancelRenderQueueItemCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="{loc:Loc Key=renderQueue.item.cancel}"
+                                                    Margin="0,0,4,0">
+                                                <Path Data="{StaticResource IconClose}" Style="{StaticResource VectorIconStyle}" Width="10" Height="10" />
+                                            </Button>
+                                            <Button Grid.Column="4"
+                                                    Style="{StaticResource IconButtonStyle}"
+                                                    Command="{Binding DataContext.RemoveRenderQueueItemCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="{loc:Loc Key=renderQueue.item.remove}">
+                                                <Path Data="{StaticResource IconClose}" Style="{StaticResource VectorIconStyle}" Width="10" Height="10" />
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </ScrollViewer>
                 </DockPanel>
             </Border>

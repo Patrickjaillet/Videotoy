@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-01
+
+### Added
+
+- Render queue (batch export): a dedicated panel to queue up multiple
+  shader exports — each item pairing a shader with its own full export
+  settings — and process them sequentially, one FFmpeg pipeline at a time
+- `RenderQueueService`/`RenderQueueItem` (`Videotoy.Media`), persisting the
+  queue to `%AppData%\Videotoy\render-queue.json` so pending/failed items
+  survive closing and reopening the app
+- Drag-and-drop reordering of queued items, with a lazily-generated
+  thumbnail per item (rendered off the export renderer, never disturbing
+  the live preview)
+- Per-item progress and status (pending / running / succeeded / failed /
+  cancelled) alongside overall queue progress (current item / total)
+- Error isolation: a failed item (invalid shader, FFmpeg error) is marked
+  failed and the queue continues with the next item, never stopping the
+  whole batch
+- Pause/resume (between items — never interrupts a running export) and
+  per-item or whole-queue cancellation
+- A completion toast summarizing the number of succeeded/failed items once
+  the whole queue finishes
+
+### Known limitations
+
+- Pause takes effect only between items, never mid-export — FFmpeg has no
+  clean pause primitive
+- A queued item's shader is re-loaded from disk when its turn comes; if the
+  source file was edited or deleted after queuing, that item fails in
+  isolation without affecting the rest of the queue
+- Thumbnails regenerate lazily the first time the render queue panel is
+  opened after a restart, so a large restored queue may briefly show
+  placeholders
+
 ## [1.4.0] - 2026-09-01
 
 ### Added

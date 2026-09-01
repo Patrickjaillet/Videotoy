@@ -98,8 +98,12 @@ public partial class App : Application
         services.AddSingleton<RecentFilesService>();
         services.AddSingleton<ExportPresetService>();
         services.AddSingleton<ExportHistoryService>();
+        services.AddSingleton<RenderQueueService>();
         services.AddSingleton<LoopSettingsService>();
         services.AddSingleton<LocalizationService>();
+
+        services.AddSingleton<BoundAssetsBuilder>();
+        services.AddSingleton<RenderQueueProcessor>();
 
         services.AddSingleton<MainWindowViewModel>();
         services.AddTransient<Views.MainWindow>();

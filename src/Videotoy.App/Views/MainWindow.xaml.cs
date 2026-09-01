@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -242,5 +243,93 @@ public partial class MainWindow : Window
 
         TogglePanelIcon.Data = (System.Windows.Media.Geometry)FindResource(
             _viewModel.IsSettingsPanelOpen ? "IconChevronRight" : "IconChevronLeft");
+    }
+
+    private Point _renderQueueDragStartPoint;
+
+    /// <summary>
+    /// Réordonnancement par glisser-déposer de la file de rendu — même
+    /// idiome standard <c>PreviewMouseLeftButtonDown</c>/<c>MouseMove</c>/
+    /// <c>DragDrop.DoDragDrop</c>/<c>Drop</c> que <see cref="OnVideoChannelDragEnter"/>/
+    /// <see cref="OnVideoChannelDrop"/>, mais réordonnant les éléments d'une
+    /// <see cref="ListBox"/> plutôt que d'accepter un fichier externe.
+    /// </summary>
+    private void OnRenderQueueItemPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _renderQueueDragStartPoint = e.GetPosition(null);
+    }
+
+    private void OnRenderQueueItemPreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || sender is not ListBox listBox)
+        {
+            return;
+        }
+
+        var currentPosition = e.GetPosition(null);
+        var delta = _renderQueueDragStartPoint - currentPosition;
+        if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        if (e.OriginalSource is not DependencyObject originalSource)
+        {
+            return;
+        }
+
+        var container = FindAncestor<ListBoxItem>(originalSource);
+        if (container?.DataContext is not RenderQueueItemViewModel item)
+        {
+            return;
+        }
+
+        DragDrop.DoDragDrop(listBox, item, DragDropEffects.Move);
+    }
+
+    private void OnRenderQueueItemDrop(object sender, DragEventArgs e)
+    {
+        if (sender is not ListBox listBox || e.Data.GetData(typeof(RenderQueueItemViewModel)) is not RenderQueueItemViewModel draggedItem)
+        {
+            return;
+        }
+
+        var targetItem = (e.OriginalSource as DependencyObject) is { } originalSource
+            ? FindAncestor<ListBoxItem>(originalSource)?.DataContext as RenderQueueItemViewModel
+            : null;
+
+        if (targetItem is null || ReferenceEquals(targetItem, draggedItem))
+        {
+            return;
+        }
+
+        var orderedIds = _viewModel.RenderQueue.Select(item => item.Id).ToList();
+        var draggedIndex = orderedIds.IndexOf(draggedItem.Id);
+        var targetIndex = orderedIds.IndexOf(targetItem.Id);
+        if (draggedIndex < 0 || targetIndex < 0)
+        {
+            return;
+        }
+
+        orderedIds.RemoveAt(draggedIndex);
+        orderedIds.Insert(targetIndex, draggedItem.Id);
+
+        _viewModel.ReorderRenderQueueItemsCommand.Execute(orderedIds);
+    }
+
+    private static T? FindAncestor<T>(DependencyObject current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 }

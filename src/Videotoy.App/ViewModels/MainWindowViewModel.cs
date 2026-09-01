@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -34,6 +35,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly AnimatedImageExportPipeline _animatedImageExportPipeline;
     private readonly AudioSpectrumTextureGenerator _audioSpectrumTextureGenerator;
     private readonly VideoTextureLoader _videoTextureLoader;
+    private readonly BoundAssetsBuilder _boundAssetsBuilder;
+    private readonly RenderQueueService _renderQueueService;
+    private readonly RenderQueueProcessor _renderQueueProcessor;
 
     private WriteableBitmap? _previewBitmap;
     private LoadedShader? _loadedShader;
@@ -58,6 +62,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isExportHistoryPanelOpen;
+
+    [ObservableProperty]
+    private bool _isRenderQueuePanelOpen;
 
     [ObservableProperty]
     private string _loadedShaderName = string.Empty;
@@ -541,6 +548,36 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasExportHistory => ExportHistory.Count > 0;
 
     /// <summary>
+    /// File d'attente de rendu (export par lots) — persistée par
+    /// <see cref="RenderQueueService"/> et traitée séquentiellement par
+    /// <see cref="RenderQueueProcessor"/>. Chargée depuis le disque au
+    /// démarrage (voir <see cref="ReloadRenderQueue"/>) ; les miniatures ne
+    /// sont générées que lorsque le panneau est ouvert pour la première
+    /// fois, afin de ne jamais ralentir le démarrage proportionnellement à
+    /// la taille de la file restaurée.
+    /// </summary>
+    public ObservableCollection<RenderQueueItemViewModel> RenderQueue { get; } = new();
+
+    public bool HasRenderQueueItems => RenderQueue.Count > 0;
+
+    [ObservableProperty]
+    private bool _isRenderQueueRunning;
+
+    [ObservableProperty]
+    private bool _isRenderQueuePaused;
+
+    [ObservableProperty]
+    private int _renderQueueCurrentItemIndex;
+
+    [ObservableProperty]
+    private int _renderQueueTotalItemCount;
+
+    [ObservableProperty]
+    private double _renderQueueOverallProgressPercent;
+
+    private bool _renderQueueThumbnailsGenerated;
+
+    /// <summary>
     /// Currently visible toast notifications (export success/failure, etc.),
     /// newest last. Each entry is removed automatically after
     /// <see cref="ToastDisplayDuration"/> via <see cref="ShowToast"/>'s
@@ -626,7 +663,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         VideoExportPipeline exportPipeline,
         AnimatedImageExportPipeline animatedImageExportPipeline,
         AudioSpectrumTextureGenerator audioSpectrumTextureGenerator,
-        VideoTextureLoader videoTextureLoader)
+        VideoTextureLoader videoTextureLoader,
+        BoundAssetsBuilder boundAssetsBuilder,
+        RenderQueueService renderQueueService,
+        RenderQueueProcessor renderQueueProcessor)
     {
         _shaderFileService = shaderFileService;
         _recentFilesService = recentFilesService;
@@ -640,12 +680,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _animatedImageExportPipeline = animatedImageExportPipeline;
         _audioSpectrumTextureGenerator = audioSpectrumTextureGenerator;
         _videoTextureLoader = videoTextureLoader;
+        _boundAssetsBuilder = boundAssetsBuilder;
+        _renderQueueService = renderQueueService;
+        _renderQueueProcessor = renderQueueProcessor;
         _previewClock.LoopDurationSeconds = _loopDurationSeconds;
         _previewClock.TimeChanged += OnPreviewClockTimeChanged;
+
+        _renderQueueProcessor.ItemProgressChanged += OnRenderQueueItemProgressChanged;
+        _renderQueueProcessor.ItemStatusChanged += OnRenderQueueItemStatusChanged;
+        _renderQueueProcessor.QueueCompleted += OnRenderQueueCompleted;
 
         ReloadRecentShaders();
         ReloadExportPresets();
         ReloadExportHistory();
+        ReloadRenderQueue();
         RecalculateExportPreview();
     }
 
@@ -991,6 +1039,211 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ToggleRenderQueuePanel()
+    {
+        IsRenderQueuePanelOpen = !IsRenderQueuePanelOpen;
+
+        if (IsRenderQueuePanelOpen && !_renderQueueThumbnailsGenerated)
+        {
+            _renderQueueThumbnailsGenerated = true;
+            GenerateMissingRenderQueueThumbnails();
+        }
+    }
+
+    private void ReloadRenderQueue()
+    {
+        RenderQueue.Clear();
+        foreach (var item in _renderQueueService.Load())
+        {
+            RenderQueue.Add(new RenderQueueItemViewModel(item));
+        }
+
+        OnPropertyChanged(nameof(HasRenderQueueItems));
+        StartRenderQueueCommand.NotifyCanExecuteChanged();
+    }
+
+    private void GenerateMissingRenderQueueThumbnails()
+    {
+        if (IsRenderQueueRunning)
+        {
+            return;
+        }
+
+        foreach (var item in RenderQueue.Where(i => i.Thumbnail is null))
+        {
+            item.Thumbnail = _renderQueueProcessor.TryGenerateThumbnail(item.Model.ShaderFilePath);
+        }
+    }
+
+    /// <summary>
+    /// Ajoute l'état actuel du panneau de paramètres d'export à la file de
+    /// rendu (voir <see cref="RenderQueueSettingsBuilder.CaptureFromCurrentPanelState"/>),
+    /// sans démarrer immédiatement son traitement.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanAddCurrentToRenderQueue))]
+    private void AddCurrentToRenderQueue(RenderQueueItemKind kind)
+    {
+        if (_loadedShaderFilePath is null)
+        {
+            return;
+        }
+
+        var item = RenderQueueSettingsBuilder.CaptureFromCurrentPanelState(
+            this, _loadedShaderFilePath, LoadedShaderName, kind, Guid.NewGuid());
+
+        _renderQueueService.Add(item);
+
+        var itemViewModel = new RenderQueueItemViewModel(item)
+        {
+            Thumbnail = _renderQueueThumbnailsGenerated ? _renderQueueProcessor.TryGenerateThumbnail(item.ShaderFilePath) : null
+        };
+        RenderQueue.Add(itemViewModel);
+
+        OnPropertyChanged(nameof(HasRenderQueueItems));
+        StartRenderQueueCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand]
+    private void RemoveRenderQueueItem(RenderQueueItemViewModel item)
+    {
+        _renderQueueService.Remove(item.Id);
+        RenderQueue.Remove(item);
+
+        OnPropertyChanged(nameof(HasRenderQueueItems));
+        StartRenderQueueCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand]
+    private void ReorderRenderQueueItems(IReadOnlyList<Guid> orderedItemIds)
+    {
+        _renderQueueService.Reorder(orderedItemIds);
+
+        var byId = RenderQueue.ToDictionary(item => item.Id);
+        RenderQueue.Clear();
+        foreach (var id in orderedItemIds)
+        {
+            if (byId.Remove(id, out var item))
+            {
+                RenderQueue.Add(item);
+            }
+        }
+
+        foreach (var remaining in byId.Values)
+        {
+            RenderQueue.Add(remaining);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStartRenderQueue))]
+    private async Task StartRenderQueueAsync()
+    {
+        var models = RenderQueue.Select(item => item.Model).ToList();
+        RenderQueueTotalItemCount = models.Count(item => item.Status == RenderQueueItemStatus.Pending);
+        RenderQueueCurrentItemIndex = 0;
+        IsRenderQueueRunning = true;
+
+        try
+        {
+            await _renderQueueProcessor.StartAsync(models);
+        }
+        finally
+        {
+            IsRenderQueueRunning = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(IsRenderQueueRunning))]
+    private void PauseRenderQueue()
+    {
+        _renderQueueProcessor.Pause();
+        IsRenderQueuePaused = true;
+    }
+
+    [RelayCommand]
+    private void ResumeRenderQueue()
+    {
+        _renderQueueProcessor.Resume();
+        IsRenderQueuePaused = false;
+    }
+
+    [RelayCommand]
+    private void CancelRenderQueueItem(RenderQueueItemViewModel item)
+    {
+        if (item.Status == RenderQueueItemStatus.Running)
+        {
+            _renderQueueProcessor.CancelCurrentItem();
+        }
+        else if (item.Status == RenderQueueItemStatus.Pending)
+        {
+            RemoveRenderQueueItem(item);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(IsRenderQueueRunning))]
+    private void CancelRenderQueue()
+    {
+        _renderQueueProcessor.CancelAll();
+    }
+
+    private void OnRenderQueueItemProgressChanged(object? sender, RenderQueueItemProgressEventArgs e)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var itemViewModel = RenderQueue.FirstOrDefault(item => item.Id == e.ItemId);
+            if (itemViewModel is not null)
+            {
+                itemViewModel.ProgressPercent = e.Progress.ProgressFraction * 100.0;
+            }
+
+            RenderQueueCurrentItemIndex = e.ItemIndex + 1;
+            RenderQueueTotalItemCount = e.TotalItems;
+            RenderQueueOverallProgressPercent =
+                e.TotalItems <= 0 ? 0.0 : (e.ItemIndex + e.Progress.ProgressFraction) / e.TotalItems * 100.0;
+
+            ExportCurrentFrame = e.Progress.CurrentFrameNumber;
+            ExportTotalFrames = e.Progress.TotalFrameCount;
+            ExportProgressPercent = e.Progress.ProgressFraction * 100.0;
+            ExportRemainingTimeText = FormatRemainingTime(e.Progress.EstimatedRemainingSeconds);
+        });
+    }
+
+    private void OnRenderQueueItemStatusChanged(object? sender, RenderQueueItemStatusEventArgs e)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var itemViewModel = RenderQueue.FirstOrDefault(item => item.Id == e.ItemId);
+            if (itemViewModel is not null)
+            {
+                itemViewModel.Status = e.Status;
+                itemViewModel.ErrorSummary = e.ErrorSummary;
+                itemViewModel.ProgressPercent = e.Status is RenderQueueItemStatus.Succeeded ? 100.0 : itemViewModel.ProgressPercent;
+            }
+
+            StartRenderQueueCommand.NotifyCanExecuteChanged();
+        });
+    }
+
+    private void OnRenderQueueCompleted(object? sender, RenderQueueCompletedEventArgs e)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            IsRenderQueueRunning = false;
+            IsRenderQueuePaused = false;
+            RenderQueueOverallProgressPercent = 0.0;
+
+            var summary = _localizationService.GetFormattedString(
+                "toast.renderQueue.completed.message", e.Succeeded, e.Failed);
+
+            ShowToast(
+                e.Failed > 0 ? ToastSeverity.Error : ToastSeverity.Success,
+                _localizationService.GetString("toast.renderQueue.completed.title"),
+                summary);
+
+            StartRenderQueueCommand.NotifyCanExecuteChanged();
+        });
+    }
+
+    [RelayCommand]
     private void OpenShader()
     {
         var dialog = new OpenFileDialog
@@ -1166,7 +1419,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool CanGenerateLoopSeamPreview() =>
         IsShaderLoaded && IsSeamlessLoopModeEnabled && !IsExporting && !IsGeneratingLoopSeamPreview;
 
-    private static WriteableBitmap CreatePreviewBitmap(byte[] pixelsRgba)
+    internal static WriteableBitmap CreatePreviewBitmap(byte[] pixelsRgba)
     {
         var bitmap = new WriteableBitmap(
             RenderTargetSize.PreviewDefault.Width,
@@ -1519,9 +1772,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return string.IsNullOrWhiteSpace(sanitized) ? "export" : sanitized;
     }
 
-    private bool CanExportVideo() => IsShaderLoaded && !IsExporting && IsVideoExportModeSelected;
+    private bool CanExportVideo() => IsShaderLoaded && !IsExporting && !IsRenderQueueRunning && IsVideoExportModeSelected;
 
-    private bool CanExportAnimatedImage() => IsShaderLoaded && !IsExporting && IsAnimatedImageExportModeSelected;
+    private bool CanExportAnimatedImage() => IsShaderLoaded && !IsExporting && !IsRenderQueueRunning && IsAnimatedImageExportModeSelected;
+
+    private bool CanAddCurrentToRenderQueue() => IsShaderLoaded && !string.IsNullOrEmpty(_loadedShaderFilePath);
+
+    private bool CanStartRenderQueue() =>
+        !IsExporting && !IsRenderQueueRunning && RenderQueue.Any(item => item.Status == RenderQueueItemStatus.Pending);
 
     /// <summary>
     /// Turns the first <c>Videotoy.Core.ExportSettingsValidator.ExportSettingsIssue</c>
@@ -1552,21 +1810,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// boucle parfaite. Retourne <c>null</c> si le shader n'utilise aucune
     /// entrée audio, ou si le fichier résolu n'existe plus sur disque.
     /// </summary>
-    private static string? ResolveExportAudioSourceFilePath(LoadedShader loadedShader)
-    {
-        var declaredPath = Videotoy.Core.ShaderModel.firstAudioChannelPath(loadedShader.Project);
-        if (declaredPath is null)
-        {
-            return null;
-        }
-
-        var baseDirectory = Path.GetDirectoryName(loadedShader.Project.SourceFilePath) ?? string.Empty;
-        var resolvedPath = Path.IsPathRooted(declaredPath.Value)
-            ? declaredPath.Value
-            : Path.Combine(baseDirectory, declaredPath.Value);
-
-        return File.Exists(resolvedPath) ? resolvedPath : null;
-    }
+    private static string? ResolveExportAudioSourceFilePath(LoadedShader loadedShader) =>
+        BoundAssetsBuilder.ResolveExportAudioSourceFilePath(loadedShader);
 
     /// <summary>
     /// Annule proprement l'export en cours : signale le token d'annulation,
@@ -1855,39 +2100,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IReadOnlyDictionary<string, BoundImageAsset> Images,
         IReadOnlyDictionary<string, BoundAudioAsset> AudioTracks,
         IReadOnlyDictionary<string, BoundVideoAsset> VideoSources)
-        BuildBoundAssets(LoadedShader loadedShader)
-    {
-        var images = loadedShader.Textures.ToDictionary(
-            pair => pair.Key,
-            pair => new BoundImageAsset(pair.Value.Width, pair.Value.Height, pair.Value.PixelDataBgra));
-
-        var audioTracks = loadedShader.AudioTracks.ToDictionary(
-            pair => pair.Key,
-            pair =>
-            {
-                var track = pair.Value;
-                return new BoundAudioAsset(timeSeconds => _audioSpectrumTextureGenerator.Generate(track, timeSeconds).PixelDataBgra);
-            });
-
-        var videoSources = loadedShader.VideoSources.ToDictionary(
-            pair => pair.Key,
-            pair =>
-            {
-                var source = pair.Value;
-                return new BoundVideoAsset((renderTimeSeconds, targetWidth, targetHeight) =>
-                {
-                    var playbackTimeSeconds = Videotoy.Core.VideoTimeMapping.resolveVideoPlaybackTimeSeconds(
-                        source.TimeMapping, source.Probe.DurationSeconds, renderTimeSeconds);
-
-                    return _videoTextureLoader
-                        .GetFramePixelsBgraAsync(source.FilePath, playbackTimeSeconds, targetWidth, targetHeight)
-                        .GetAwaiter()
-                        .GetResult();
-                });
-            });
-
-        return (images, audioTracks, videoSources);
-    }
+        BuildBoundAssets(LoadedShader loadedShader) => _boundAssetsBuilder.Build(loadedShader);
 
     private void InitializePreview(LoadedShader loadedShader)
     {
@@ -1976,6 +2189,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ExportVideoCommand.NotifyCanExecuteChanged();
         ExportAnimatedImageCommand.NotifyCanExecuteChanged();
         GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
+        AddCurrentToRenderQueueCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsExportingChanged(bool value)
@@ -1984,6 +2198,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ExportAnimatedImageCommand.NotifyCanExecuteChanged();
         CancelExportCommand.NotifyCanExecuteChanged();
         GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
+        StartRenderQueueCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsRenderQueueRunningChanged(bool value)
+    {
+        ExportVideoCommand.NotifyCanExecuteChanged();
+        ExportAnimatedImageCommand.NotifyCanExecuteChanged();
+        StartRenderQueueCommand.NotifyCanExecuteChanged();
+        PauseRenderQueueCommand.NotifyCanExecuteChanged();
+        CancelRenderQueueCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedExportKindChanged(ExportKindOption value)
