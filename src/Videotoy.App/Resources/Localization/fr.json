@@ -27,6 +27,8 @@
   "issues.panel.line": "Ligne {0}",
 
   "panel.renderSettings": "Paramètres de rendu",
+  "panel.history.undo": "Annuler",
+  "panel.history.redo": "Rétablir",
 
   "panel.exportKind.sectionLabel": "TYPE D'EXPORT",
 

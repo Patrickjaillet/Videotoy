@@ -27,6 +27,8 @@
   "issues.panel.line": "Line {0}",
 
   "panel.renderSettings": "Render Settings",
+  "panel.history.undo": "Undo",
+  "panel.history.redo": "Redo",
 
   "panel.exportKind.sectionLabel": "EXPORT TYPE",
 

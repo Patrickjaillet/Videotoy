@@ -39,6 +39,44 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly RenderQueueService _renderQueueService;
     private readonly RenderQueueProcessor _renderQueueProcessor;
 
+    /// <summary>
+    /// Pile d'annulation/rétablissement partagée par les paramètres d'export
+    /// et les valeurs des sliders d'uniforms custom (jamais le contenu du
+    /// shader lui-même) — voir Phase v1.6.0 du roadmap. Vidée à chaque
+    /// chargement de shader (<see cref="LoadShaderFile"/>).
+    /// </summary>
+    private readonly Videotoy.App.History.SettingsUndoStack _historyStack = new();
+
+    /// <summary>
+    /// Profondeur de la transaction d'historique en cours : incrémentée par
+    /// <c>On&lt;Prop&gt;Changing</c> lorsqu'une modification synchrone démarre,
+    /// décrémentée par <c>On&lt;Prop&gt;Changed</c> une fois la mutation
+    /// terminée. Une seule entrée d'historique est poussée lorsque la
+    /// profondeur retombe à zéro, ce qui regroupe automatiquement les
+    /// cascades (ex. changer le codec vidéo réinitialise aussi le profil
+    /// vidéo) en une seule action annulable, sans avoir à énumérer
+    /// explicitement quelles propriétés cascadent vers lesquelles.
+    /// </summary>
+    private int _historyTransactionDepth;
+
+    private Videotoy.App.History.ExportSettingsSnapshot? _historyTransactionBefore;
+
+    /// <summary>
+    /// Empêche toute capture d'historique pendant l'application d'un
+    /// undo/redo (<see cref="Undo"/>/<see cref="Redo"/>) ou pendant le
+    /// chargement d'un nouveau shader (<see cref="LoadShaderFile"/>), pour
+    /// éviter qu'une réaffectation programmatique ne soit elle-même
+    /// capturée comme une action utilisateur annulable.
+    /// </summary>
+    private bool _suppressHistoryCapture;
+
+    /// <summary>
+    /// Snapshot des valeurs de sliders d'uniforms custom capturé par
+    /// <see cref="BeginCustomUniformEdit"/>, ou <c>null</c> si aucun geste
+    /// d'édition n'est en cours (voir <see cref="EndCustomUniformEdit"/>).
+    /// </summary>
+    private Dictionary<(string GroupName, int ComponentIndex), float>? _customUniformEditBefore;
+
     private WriteableBitmap? _previewBitmap;
     private LoadedShader? _loadedShader;
     private string? _loadedShaderFilePath;
@@ -577,6 +615,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private bool _renderQueueThumbnailsGenerated;
 
+    [ObservableProperty]
+    private bool _canUndo;
+
+    [ObservableProperty]
+    private bool _canRedo;
+
     /// <summary>
     /// Currently visible toast notifications (export success/failure, etc.),
     /// newest last. Each entry is removed automatically after
@@ -689,6 +733,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _renderQueueProcessor.ItemProgressChanged += OnRenderQueueItemProgressChanged;
         _renderQueueProcessor.ItemStatusChanged += OnRenderQueueItemStatusChanged;
         _renderQueueProcessor.QueueCompleted += OnRenderQueueCompleted;
+
+        _historyStack.StateChanged += OnHistoryStackStateChanged;
 
         ReloadRecentShaders();
         ReloadExportPresets();
@@ -1038,6 +1084,115 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasExportHistory));
     }
 
+    private void OnHistoryStackStateChanged(object? sender, EventArgs e)
+    {
+        CanUndo = _historyStack.CanUndo;
+        CanRedo = _historyStack.CanRedo;
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Ouvre une transaction d'historique si aucune n'est déjà en cours
+    /// (profondeur 0 -&gt; 1) en capturant l'état "avant", puis incrémente la
+    /// profondeur dans tous les cas. Appelée par chaque hook
+    /// <c>On&lt;Prop&gt;Changing</c> des propriétés d'export undoable, ainsi que
+    /// par <c>MainWindow.xaml.cs</c> au focus d'un <c>TextBox</c> undoable
+    /// (regroupe toute la frappe jusqu'au <c>LostFocus</c> en une seule
+    /// entrée d'historique, plutôt qu'une entrée par caractère tapé — les
+    /// hooks <c>On&lt;Prop&gt;Changing</c> déclenchés pendant la frappe
+    /// s'imbriquent alors dans cette transaction déjà ouverte sans en
+    /// démarrer une nouvelle).
+    /// </summary>
+    internal void BeginHistoryTransaction()
+    {
+        if (_suppressHistoryCapture)
+        {
+            return;
+        }
+
+        if (_historyTransactionDepth == 0)
+        {
+            _historyTransactionBefore = Videotoy.App.History.ExportSettingsSnapshot.Capture(this);
+        }
+
+        _historyTransactionDepth++;
+    }
+
+    /// <summary>
+    /// Décrémente la profondeur de transaction ; lorsqu'elle retombe à zéro,
+    /// pousse une unique <see cref="Videotoy.App.History.ExportSettingsCommand"/>
+    /// capturant tout ce qui a changé pendant la transaction (y compris les
+    /// cascades), sauf si rien n'a réellement changé (égalité de record).
+    /// </summary>
+    internal void EndHistoryTransaction()
+    {
+        if (_suppressHistoryCapture)
+        {
+            return;
+        }
+
+        if (_historyTransactionDepth == 0)
+        {
+            return;
+        }
+
+        _historyTransactionDepth--;
+
+        if (_historyTransactionDepth > 0)
+        {
+            return;
+        }
+
+        var before = _historyTransactionBefore;
+        _historyTransactionBefore = null;
+
+        if (before is null)
+        {
+            return;
+        }
+
+        var after = Videotoy.App.History.ExportSettingsSnapshot.Capture(this);
+        if (before == after)
+        {
+            return;
+        }
+
+        _historyStack.Push(new Videotoy.App.History.ExportSettingsCommand(this, before, after));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void Undo()
+    {
+        _suppressHistoryCapture = true;
+        try
+        {
+            _historyStack.Undo();
+        }
+        finally
+        {
+            _suppressHistoryCapture = false;
+        }
+
+        RecalculateExportPreview();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRedo))]
+    private void Redo()
+    {
+        _suppressHistoryCapture = true;
+        try
+        {
+            _historyStack.Redo();
+        }
+        finally
+        {
+            _suppressHistoryCapture = false;
+        }
+
+        RecalculateExportPreview();
+    }
+
     [RelayCommand]
     private void ToggleRenderQueuePanel()
     {
@@ -1294,6 +1449,62 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         _isScrubbing = true;
         _previewClock.Pause();
+    }
+
+    /// <summary>
+    /// Débute un geste d'édition d'un slider d'uniform custom (glisser ou
+    /// modification atomique isolée) : capture l'état "avant" de tous les
+    /// sliders, pour que <see cref="EndCustomUniformEdit"/> puisse pousser
+    /// une unique entrée d'historique couvrant tout le geste plutôt qu'une
+    /// entrée par changement de valeur (le binding XAML utilise
+    /// <c>UpdateSourceTrigger=PropertyChanged</c> et déclenche donc un
+    /// changement par tick de glissement).
+    /// </summary>
+    [RelayCommand]
+    private void BeginCustomUniformEdit()
+    {
+        _customUniformEditBefore = CaptureCustomUniformValues();
+    }
+
+    /// <summary>
+    /// Termine le geste d'édition en cours : pousse une unique
+    /// <see cref="Videotoy.App.History.CustomUniformsCommand"/> si au moins
+    /// une valeur a changé depuis <see cref="BeginCustomUniformEdit"/>.
+    /// Se comporte comme un no-op si <c>Begin</c> n'a pas été appelé (ex.
+    /// modification déclenchée au clavier plutôt qu'au glisser).
+    /// </summary>
+    [RelayCommand]
+    private void EndCustomUniformEdit()
+    {
+        var before = _customUniformEditBefore;
+        _customUniformEditBefore = null;
+
+        if (before is null || _suppressHistoryCapture)
+        {
+            return;
+        }
+
+        var after = CaptureCustomUniformValues();
+        if (before.Count == after.Count && before.All(pair => after.TryGetValue(pair.Key, out var value) && value == pair.Value))
+        {
+            return;
+        }
+
+        _historyStack.Push(new Videotoy.App.History.CustomUniformsCommand(this, before, after));
+    }
+
+    private Dictionary<(string GroupName, int ComponentIndex), float> CaptureCustomUniformValues()
+    {
+        var values = new Dictionary<(string GroupName, int ComponentIndex), float>();
+        foreach (var group in CustomUniformGroups)
+        {
+            foreach (var slider in group.Sliders)
+            {
+                values[(group.Name, slider.ComponentIndex)] = slider.Value;
+            }
+        }
+
+        return values;
     }
 
     [RelayCommand]
@@ -1896,8 +2107,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
+        _suppressHistoryCapture = true;
         try
         {
+            _historyStack.Clear();
+
             var loadedShader = _shaderFileService.Load(filePath);
             _loadedShaderFilePath = filePath;
 
@@ -1942,6 +2156,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusMessage = $"Failed to load shader: {ex.Message}";
+        }
+        finally
+        {
+            _suppressHistoryCapture = false;
         }
     }
 
@@ -2210,6 +2428,42 @@ public sealed partial class MainWindowViewModel : ObservableObject
         CancelRenderQueueCommand.NotifyCanExecuteChanged();
     }
 
+    // Hooks On<Prop>Changing des propriétés d'export undoable (Phase v1.6.0) :
+    // ouvrent une transaction d'historique juste avant la mutation. Chaque
+    // On<Prop>Changed correspondant appelle EndHistoryTransaction() en
+    // dernière instruction pour la refermer — voir BeginHistoryTransaction/
+    // EndHistoryTransaction pour le mécanisme de regroupement des cascades.
+    partial void OnSelectedResolutionPresetChanging(ResolutionPresetOption value) => BeginHistoryTransaction();
+    partial void OnCustomResolutionWidthChanging(int value) => BeginHistoryTransaction();
+    partial void OnCustomResolutionHeightChanging(int value) => BeginHistoryTransaction();
+    partial void OnSelectedFrameRatePresetChanging(FrameRatePresetOption value) => BeginHistoryTransaction();
+    partial void OnCustomFrameRateValueChanging(double value) => BeginHistoryTransaction();
+    partial void OnManualDurationUnitChanging(DurationUnit value) => BeginHistoryTransaction();
+    partial void OnManualDurationValueChanging(double value) => BeginHistoryTransaction();
+    partial void OnIsSeamlessLoopModeEnabledChanging(bool value) => BeginHistoryTransaction();
+    partial void OnLoopDurationSecondsChanging(double value) => BeginHistoryTransaction();
+    partial void OnIsLoopEndFrameExclusiveChanging(bool value) => BeginHistoryTransaction();
+    partial void OnSelectedExportKindChanging(ExportKindOption value) => BeginHistoryTransaction();
+    partial void OnSelectedAnimatedImageFormatChanging(AnimatedImageFormatOption value) => BeginHistoryTransaction();
+    partial void OnGifColorCountChanging(int value) => BeginHistoryTransaction();
+    partial void OnSelectedGifDitherChanging(GifDitherOption value) => BeginHistoryTransaction();
+    partial void OnWebPQualityChanging(int value) => BeginHistoryTransaction();
+    partial void OnIsWebPLosslessEnabledChanging(bool value) => BeginHistoryTransaction();
+    partial void OnSelectedContainerFormatChanging(ContainerFormatOption value) => BeginHistoryTransaction();
+    partial void OnSelectedVideoCodecChanging(VideoCodecOption value) => BeginHistoryTransaction();
+    partial void OnIsTargetBitrateModeEnabledChanging(bool value) => BeginHistoryTransaction();
+    partial void OnTargetBitrateKbpsChanging(int value) => BeginHistoryTransaction();
+    partial void OnConstantRateFactorValueChanging(int value) => BeginHistoryTransaction();
+    partial void OnSelectedSpeedPresetChanging(SpeedPresetOption value) => BeginHistoryTransaction();
+    partial void OnSelectedVideoProfileChanging(VideoProfileOption value) => BeginHistoryTransaction();
+    partial void OnIsGopSizeEnabledChanging(bool value) => BeginHistoryTransaction();
+    partial void OnGopSizeValueChanging(int value) => BeginHistoryTransaction();
+    partial void OnIsTwoPassEnabledChanging(bool value) => BeginHistoryTransaction();
+    partial void OnSelectedHardwareEncoderChanging(HardwareEncoderOption value) => BeginHistoryTransaction();
+    partial void OnSelectedAudioCodecChanging(AudioCodecOption value) => BeginHistoryTransaction();
+    partial void OnAudioBitrateKbpsChanging(int value) => BeginHistoryTransaction();
+    partial void OnIncludeAudioInExportChanging(bool value) => BeginHistoryTransaction();
+
     partial void OnSelectedExportKindChanged(ExportKindOption value)
     {
         OnPropertyChanged(nameof(IsVideoExportModeSelected));
@@ -2229,6 +2483,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ExportVideoCommand.NotifyCanExecuteChanged();
         ExportAnimatedImageCommand.NotifyCanExecuteChanged();
         RecalculateExportPreview();
+        EndHistoryTransaction();
     }
 
     partial void OnSelectedAnimatedImageFormatChanged(AnimatedImageFormatOption value)
@@ -2237,18 +2492,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsWebPFormatSelected));
         OnPropertyChanged(nameof(IsWebPQualitySectionVisible));
         RecalculateExportPreview();
+        EndHistoryTransaction();
     }
 
-    partial void OnGifColorCountChanged(int value) => RecalculateExportPreview();
+    partial void OnGifColorCountChanged(int value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnSelectedGifDitherChanged(GifDitherOption value) => RecalculateExportPreview();
+    partial void OnSelectedGifDitherChanged(GifDitherOption value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnWebPQualityChanged(int value) => RecalculateExportPreview();
+    partial void OnWebPQualityChanged(int value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
     partial void OnIsWebPLosslessEnabledChanged(bool value)
     {
         OnPropertyChanged(nameof(IsWebPQualitySectionVisible));
         RecalculateExportPreview();
+        EndHistoryTransaction();
     }
 
     partial void OnIsGeneratingLoopSeamPreviewChanged(bool value) => GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
@@ -2258,17 +2527,38 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _previewClock.LoopDurationSeconds = value;
         RecalculateExportPreview();
         PersistLoopSettings();
+        EndHistoryTransaction();
     }
 
-    partial void OnSelectedResolutionPresetChanged(ResolutionPresetOption value) => RecalculateExportPreview();
+    partial void OnSelectedResolutionPresetChanged(ResolutionPresetOption value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnCustomResolutionWidthChanged(int value) => RecalculateExportPreview();
+    partial void OnCustomResolutionWidthChanged(int value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnCustomResolutionHeightChanged(int value) => RecalculateExportPreview();
+    partial void OnCustomResolutionHeightChanged(int value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnSelectedFrameRatePresetChanged(FrameRatePresetOption value) => RecalculateExportPreview();
+    partial void OnSelectedFrameRatePresetChanged(FrameRatePresetOption value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnCustomFrameRateValueChanged(double value) => RecalculateExportPreview();
+    partial void OnCustomFrameRateValueChanged(double value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
     partial void OnSelectedContainerFormatChanged(ContainerFormatOption value)
     {
@@ -2293,6 +2583,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         RecalculateExportPreview();
+        EndHistoryTransaction();
     }
 
     partial void OnSelectedVideoCodecChanged(VideoCodecOption value)
@@ -2319,6 +2610,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsHardwareEncoderSectionVisible));
 
         RecalculateExportPreview();
+        EndHistoryTransaction();
     }
 
     partial void OnIsTargetBitrateModeEnabledChanged(bool value)
@@ -2329,39 +2621,82 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         RecalculateExportPreview();
+        EndHistoryTransaction();
     }
 
-    partial void OnTargetBitrateKbpsChanged(int value) => RecalculateExportPreview();
+    partial void OnTargetBitrateKbpsChanged(int value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnConstantRateFactorValueChanged(int value) => RecalculateExportPreview();
+    partial void OnConstantRateFactorValueChanged(int value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnSelectedSpeedPresetChanged(SpeedPresetOption value) => RecalculateExportPreview();
+    partial void OnSelectedSpeedPresetChanged(SpeedPresetOption value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnSelectedVideoProfileChanged(VideoProfileOption value) => RecalculateExportPreview();
+    partial void OnSelectedVideoProfileChanged(VideoProfileOption value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnIsGopSizeEnabledChanged(bool value) => RecalculateExportPreview();
+    partial void OnIsGopSizeEnabledChanged(bool value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnGopSizeValueChanged(int value) => RecalculateExportPreview();
+    partial void OnGopSizeValueChanged(int value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnIsTwoPassEnabledChanged(bool value) => RecalculateExportPreview();
+    partial void OnIsTwoPassEnabledChanged(bool value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
-    partial void OnSelectedHardwareEncoderChanged(HardwareEncoderOption value) => RecalculateExportPreview();
+    partial void OnSelectedHardwareEncoderChanged(HardwareEncoderOption value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
     partial void OnSelectedAudioCodecChanged(AudioCodecOption value)
     {
         OnPropertyChanged(nameof(IsAudioBitrateFieldVisible));
         RecalculateExportPreview();
+        EndHistoryTransaction();
     }
 
-    partial void OnAudioBitrateKbpsChanged(int value) => RecalculateExportPreview();
+    partial void OnAudioBitrateKbpsChanged(int value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
     partial void OnIsSeamlessLoopModeEnabledChanged(bool value)
     {
         RecalculateExportPreview();
         PersistLoopSettings();
+        EndHistoryTransaction();
     }
 
-    partial void OnIsLoopEndFrameExclusiveChanged(bool value) => RecalculateExportPreview();
+    partial void OnIsLoopEndFrameExclusiveChanged(bool value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
     partial void OnHasLoopRoundingMismatchChanged(bool value) => ApplyAssistedLoopRoundingCommand.NotifyCanExecuteChanged();
 
@@ -2371,9 +2706,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ManualDurationUnitIndex));
         RecalculateExportPreview();
+        EndHistoryTransaction();
     }
 
-    partial void OnManualDurationValueChanged(double value) => RecalculateExportPreview();
+    partial void OnManualDurationValueChanged(double value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
     partial void OnHasAudioChannelChanged(bool value)
     {
@@ -2381,7 +2721,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RecalculateExportPreview();
     }
 
-    partial void OnIncludeAudioInExportChanged(bool value) => RecalculateExportPreview();
+    partial void OnIncludeAudioInExportChanged(bool value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
 
     partial void OnNewExportPresetNameChanged(string value) => SaveExportPresetCommand.NotifyCanExecuteChanged();
 

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-01
+
+### Added
+
+- Undo/redo on render/export settings: a shared history stack covering
+  resolution, frame rate, duration/loop, container/codec, rate control,
+  speed preset, video profile, GOP, two-pass, hardware encoder, audio
+  codec/bitrate, animated-image (GIF/WebP) settings, and custom-uniform
+  slider values — never the shader file content itself
+- Every setting change pushes a reversible command instead of mutating
+  state directly; a whole-settings snapshot per entry means cascading
+  changes (e.g. switching video codec resets the video profile and,
+  conditionally, the hardware encoder) always undo/redo together as one
+  step
+- Continuous gestures — dragging a custom-uniform slider, or typing into a
+  numeric field — are coalesced into a single history entry per gesture
+  (drag start/end, or focus-in/focus-out), instead of one entry per tick or
+  keystroke
+- Ctrl+Z / Ctrl+Y keyboard shortcuts, active while the render settings
+  panel has focus
+- Undo/redo buttons in the settings panel header, enabled or disabled
+  according to the history stack's state
+- The history stack resets whenever a new shader is loaded
+
 ## [1.5.0] - 2026-09-01
 
 ### Added

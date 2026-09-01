@@ -64,6 +64,42 @@ public partial class MainWindow : Window
         _viewModel.BeginScrubCommand.Execute(null);
     }
 
+    /// <summary>
+    /// Début d'un glisser sur un slider d'uniform custom : capture l'état
+    /// "avant" côté ViewModel (voir <see cref="MainWindowViewModel.BeginCustomUniformEdit"/>)
+    /// afin que tout le geste de glisser soit regroupé en une seule entrée
+    /// d'historique (Phase v1.6.0), plutôt qu'une entrée par tick.
+    /// </summary>
+    private void OnCustomUniformSliderDragStarted(object sender, MouseButtonEventArgs e)
+    {
+        _viewModel.BeginCustomUniformEditCommand.Execute(null);
+    }
+
+    private void OnCustomUniformSliderDragCompleted(object sender, MouseButtonEventArgs e)
+    {
+        _viewModel.EndCustomUniformEditCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Regroupe toute une session de frappe dans un champ numérique
+    /// undoable (résolution custom, FPS custom, durée manuelle, CRF,
+    /// bitrate cible, GOP, bitrate audio, GifColorCount, WebPQuality) en une
+    /// seule entrée d'historique (Phase v1.6.0), plutôt qu'une entrée par
+    /// caractère tapé — la transaction s'ouvre au focus et se referme au
+    /// <see cref="OnUndoableTextBoxLostFocus"/>, les hooks
+    /// <c>On&lt;Prop&gt;Changing</c>/<c>Changed</c> déclenchés par chaque
+    /// frappe s'imbriquant dans cette transaction déjà ouverte.
+    /// </summary>
+    private void OnUndoableTextBoxGotFocus(object sender, RoutedEventArgs e)
+    {
+        _viewModel.BeginHistoryTransaction();
+    }
+
+    private void OnUndoableTextBoxLostFocus(object sender, RoutedEventArgs e)
+    {
+        _viewModel.EndHistoryTransaction();
+    }
+
     private void OnTimelineDragCompleted(object sender, MouseButtonEventArgs e)
     {
         if (!_isUserScrubbingTimeline)
