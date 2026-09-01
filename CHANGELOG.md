@@ -10,6 +10,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - `Directory.Build.props` / `Videotoy.Core.Version` were still stamped
+  `0.8.0` even though Phase v1.0.0 (installer & release) is now fully
+  complete in `ROADMAP.md`. Bumped `VersionPrefix`/`FileVersion`/
+  `AssemblyVersion`/`InformationalVersion` in `Directory.Build.props` and
+  `Major`/`Minor`/`Patch` in `Videotoy.Core.Version` to `1.0.0`, so the
+  installer's `AppVersion`/`OutputBaseFilename` and the in-app "À propos"
+  version both reflect the actual release
+
+- `docs/index.html`: hero eyebrow badge still read "v0.3.0" instead of the
+  current release version
+
+- `GlslToHlslTranspiler.fs`: minified/"code-golf" style Shadertoy shaders
+  commonly declare a scalar/vector local without initializing it and rely
+  on it being used before assignment (e.g. `float a,c,h,j; for(u*=a; ...)`),
+  a behavior most GLSL/WebGL drivers tolerate implicitly but that isn't
+  guaranteed by the GLSL spec. HLSL/FXC rejects this outright
+  (`X4000: variable used without having been completely initialized`),
+  breaking otherwise-valid Shadertoy shaders on load. Added a transpiler
+  pass (`initializeUnassignedLocals`) that scans multi-identifier local
+  declarations of scalar/vector HLSL types (`float`/`int`/`uint`/`bool`
+  and their `2`/`3`/`4`-component forms) and appends an explicit zero
+  initializer (`= 0.`, `= float3(0, 0, 0)`, etc.) to every identifier in
+  the list that doesn't already have one, leaving already-initialized
+  identifiers and single-identifier declarations untouched. Runs after
+  type replacement so it matches HLSL type names directly
+
+- `GlslToHlslTranspiler.fs`: `fragCoord` was assigned directly from
+  `SV_Position.xy`, whose origin is top-left with Y increasing downward
+  (Direct3D screen-space convention). Shadertoy's `fragCoord` origin is
+  bottom-left with Y increasing upward (OpenGL convention), so every
+  transpiled shader rendered vertically flipped versus its Shadertoy
+  preview. `fragCoord.y` is now computed as `iResolution.y - __svPosition.y`
+  in the generated `PSMain` prologue so the Y axis matches Shadertoy's
+  convention
+
+- `Directory.Build.props` / `Videotoy.Core.Version` were still stamped
   `0.3.0`, three completed roadmap phases (v0.5.0–v0.8.0) behind the
   actually shipped feature set (the last fully-`[x]` phase in
   `ROADMAP.md`), silently violating this project's own "automatic SemVer
@@ -20,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `Videotoy.Core.Version` to `0.8.0`
 
 ### Added
+
+- `docs/index.html`: added a direct download button for the current
+  release asset (`Videotoy-Setup-1.0.0.exe`), alongside the existing
+  "Voir toutes les releases" link — "Mise à jour finale du site GitHub
+  Pages avec le lien de téléchargement de la release" roadmap item,
+  completing Phase v1.0.0. The download panel's requirement grid also now
+  shows the current version number
 
 - SemVer validation and display in the installer — "Signature/vérification
   de version affichée dans l'installateur (SemVer)" roadmap item:

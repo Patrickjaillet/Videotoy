@@ -135,6 +135,58 @@ let private applyTextureCalls (source: string) : string =
 let private applyDiscard (source: string) : string =
     discardRegex.Replace(source, "clip(-1);")
 
+/// GLSL tolère l'usage de variables locales scalaires/vectorielles avant
+/// toute affectation dans une déclaration multiple (ex. `float a,c,h,j;`
+/// suivi de `u *= a;`) : la plupart des drivers OpenGL/WebGL initialisent
+/// implicitement ces slots à zéro, un comportement non garanti par la norme
+/// mais massivement exploité par les shaders "minifiés"/code-golf de
+/// Shadertoy pour économiser une init explicite. HLSL/FXC refuse ce
+/// raccourci (`X4000: variable used without having been completely
+/// initialized`) et interrompt la compilation. Cette passe repère chaque
+/// déclaration multiple d'un type scalaire ou vectoriel HLSL (float/int/
+/// uint/bool, float2..4/int2..4/...) et ajoute `= 0`/`= 0.` (ou
+/// `= floatN(0, ...)` pour les types vectoriels) à tout identifiant de la
+/// liste qui n'a pas déjà d'initialiseur explicite, reproduisant ainsi le
+/// comportement observé sur shadertoy.com. Les déclarations déjà
+/// entièrement initialisées, ou celles à un seul identifiant, sont
+/// laissées à l'écart du dernier `fold` (aucune modification nécessaire).
+let private uninitializedDeclarationRegex =
+    Regex(
+        @"(?<![.\w])(float|int|uint|bool|float2|float3|float4|int2|int3|int4|uint2|uint3|uint4|bool2|bool3|bool4)\s+([A-Za-z_]\w*(?:\s*(?:=[^,;]+)?\s*,\s*[A-Za-z_]\w*(?:\s*=[^,;]+)?)+)\s*;",
+        RegexOptions.Compiled)
+
+let private zeroLiteralFor (typeName: string) : string =
+    match typeName with
+    | "float" -> "0."
+    | "int" -> "0"
+    | "uint" -> "0u"
+    | "bool" -> "false"
+    | t when t.StartsWith("float") -> t + "(" + String.replicate (int (t.Substring(5)) - 1) "0, " + "0)"
+    | t when t.StartsWith("int") -> t + "(" + String.replicate (int (t.Substring(3)) - 1) "0, " + "0)"
+    | t when t.StartsWith("uint") -> t + "(" + String.replicate (int (t.Substring(4)) - 1) "0u, " + "0u)"
+    | t when t.StartsWith("bool") -> t + "(" + String.replicate (int (t.Substring(4)) - 1) "false, " + "false)"
+    | _ -> "0."
+
+let private initializeUnassignedLocals (source: string) : string =
+    uninitializedDeclarationRegex.Replace(
+        source,
+        fun m ->
+            let typeName = m.Groups.[1].Value
+            let identifiersPart = m.Groups.[2].Value
+            let zero = zeroLiteralFor typeName
+
+            let rewrittenIdentifiers =
+                identifiersPart.Split(',')
+                |> Array.map (fun rawIdentifier ->
+                    let identifier = rawIdentifier.Trim()
+                    if identifier.Contains("=") then
+                        identifier
+                    else
+                        sprintf "%s = %s" identifier zero)
+                |> String.concat ", "
+
+            sprintf "%s %s;" typeName rewrittenIdentifiers)
+
 let private renameMainImage (source: string) : string * string * string =
     let currentMatch = mainImageSignatureRegex.Match(source)
 
@@ -144,7 +196,7 @@ let private renameMainImage (source: string) : string * string * string =
         let rewritten =
             mainImageSignatureRegex.Replace(
                 source,
-                sprintf "float4 PSMain(float4 __svPosition : SV_Position) : SV_Target\n{\n    float4 %s = float4(0, 0, 0, 0);\n    float2 %s = __svPosition.xy;" outputVar coordVar,
+                sprintf "float4 PSMain(float4 __svPosition : SV_Position) : SV_Target\n{\n    float4 %s = float4(0, 0, 0, 0);\n    float2 %s = float2(__svPosition.x, iResolution.y - __svPosition.y);" outputVar coordVar,
                 1)
         rewritten, outputVar, coordVar
     else
@@ -224,6 +276,7 @@ let transpilePass (commonCode: string option) (pass: ShaderPass) : TranspileResu
         |> applyTypeReplacements
         |> expandScalarVectorConstructors
         |> applyFunctionReplacements
+        |> initializeUnassignedLocals
 
     let renamed, outputVar, _coordVar = renameMainImage preprocessed
 
