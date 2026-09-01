@@ -27,6 +27,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ExportPresetService _exportPresetService;
     private readonly ExportHistoryService _exportHistoryService;
     private readonly LoopSettingsService _loopSettingsService;
+    private readonly OnboardingStateService _onboardingStateService;
     private readonly LocalizationService _localizationService;
     private readonly MultiPassRenderer _previewRenderer;
     private readonly PreviewClock _previewClock = new();
@@ -591,6 +592,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public ObservableCollection<ShaderIssueViewModel> ShaderIssues { get; } = new();
 
+    /// <summary>
+    /// Filtre par sévérité de la liste <see cref="ShaderIssues"/> (Phase
+    /// v1.8.0) — les deux bascules sont indépendantes (un problème n'est
+    /// affiché que si sa sévérité correspondante est cochée). Par défaut,
+    /// tout est affiché, identique au comportement pré-v1.8.0.
+    /// </summary>
+    [ObservableProperty]
+    private bool _showErrorIssues = true;
+
+    [ObservableProperty]
+    private bool _showWarningIssues = true;
+
+    /// <summary>
+    /// Noms de passe distincts (ex. "Image", "Buffer A") présents dans
+    /// <see cref="ShaderIssues"/> à l'instant courant, recalculés à chaque
+    /// rechargement/recompilation du shader — sert à peupler dynamiquement
+    /// la rangée de puces de filtre par passe (Phase v1.8.0).
+    /// </summary>
+    public ObservableCollection<ShaderIssuePassFilterViewModel> AvailablePassNames { get; } = new();
+
     public ObservableCollection<ExportPreset> ExportPresets { get; } = new();
 
     public ObservableCollection<ExportHistoryEntry> ExportHistory { get; } = new();
@@ -632,6 +653,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _canRedo;
+
+    /// <summary>
+    /// Expand/collapse state of the render-settings panel's 5 thematic
+    /// groups (Phase v1.8.0) — in-memory only, reset to expanded on every
+    /// launch (no persistence), so nothing regresses visually versus the
+    /// pre-v1.8.0 always-visible flat layout.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isResolutionGroupExpanded = true;
+
+    [ObservableProperty]
+    private bool _isDurationLoopGroupExpanded = true;
+
+    [ObservableProperty]
+    private bool _isCodecContainerGroupExpanded = true;
+
+    [ObservableProperty]
+    private bool _isInputsGroupExpanded = true;
+
+    [ObservableProperty]
+    private bool _isRenderQueueGroupExpanded = true;
 
     /// <summary>
     /// Currently visible toast notifications (export success/failure, etc.),
@@ -707,12 +749,30 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _newExportPresetName = string.Empty;
 
+    /// <summary>
+    /// First-launch guided onboarding overlay (Phase v1.8.0) — a fixed
+    /// 3-step sequence (viewport, settings panel, render queue), shown
+    /// once per <see cref="OnboardingStateService.CurrentOnboardingVersion"/>
+    /// unless voluntarily replayed via the Help menu. Positioning of the
+    /// spotlight/callout for each step is view geometry, owned by
+    /// <c>MainWindow.xaml.cs</c> (not meaningfully MVVM state) — this
+    /// ViewModel only tracks which step is active.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isOnboardingActive;
+
+    [ObservableProperty]
+    private int _currentOnboardingStepIndex;
+
+    public const int OnboardingStepCount = 3;
+
     public MainWindowViewModel(
         ShaderFileService shaderFileService,
         RecentFilesService recentFilesService,
         ExportPresetService exportPresetService,
         ExportHistoryService exportHistoryService,
         LoopSettingsService loopSettingsService,
+        OnboardingStateService onboardingStateService,
         LocalizationService localizationService,
         PreviewMultiPassRenderer previewRenderer,
         ExportMultiPassRenderer exportRenderer,
@@ -729,6 +789,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _exportPresetService = exportPresetService;
         _exportHistoryService = exportHistoryService;
         _loopSettingsService = loopSettingsService;
+        _onboardingStateService = onboardingStateService;
         _localizationService = localizationService;
         _previewRenderer = previewRenderer;
         _exportRenderer = exportRenderer;
@@ -1436,6 +1497,64 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsIssuesPanelOpen = false;
     }
 
+    /// <summary>
+    /// Bascule manuelle du panneau Shader Issues (Phase v1.8.0, barre
+    /// d'outils) — <see cref="IsIssuesPanelOpen"/> s'ouvre normalement tout
+    /// seul dès qu'un problème est détecté ; ce bouton permet en plus de le
+    /// rouvrir manuellement après une fermeture volontaire, symétrique aux
+    /// bascules déjà existantes pour les panneaux Historique/File de rendu.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleIssuesPanel()
+    {
+        IsIssuesPanelOpen = !IsIssuesPanelOpen;
+    }
+
+    /// <summary>
+    /// Called on <c>MainWindow.Loaded</c>: starts the guided onboarding
+    /// sequence only if it has never been shown before (Phase v1.8.0).
+    /// </summary>
+    public void StartOnboardingIfFirstLaunch()
+    {
+        var state = _onboardingStateService.Load();
+        if (!state.HasSeenOnboarding)
+        {
+            CurrentOnboardingStepIndex = 0;
+            IsOnboardingActive = true;
+        }
+    }
+
+    /// <summary>
+    /// Voluntary replay from the Help menu (Phase v1.8.0) — not gated by
+    /// <see cref="OnboardingStateService"/> state, always restarts from the
+    /// first step.
+    /// </summary>
+    [RelayCommand]
+    private void ReplayOnboarding()
+    {
+        CurrentOnboardingStepIndex = 0;
+        IsOnboardingActive = true;
+    }
+
+    [RelayCommand]
+    private void NextOnboardingStep()
+    {
+        if (CurrentOnboardingStepIndex + 1 >= OnboardingStepCount)
+        {
+            SkipOnboarding();
+            return;
+        }
+
+        CurrentOnboardingStepIndex++;
+    }
+
+    [RelayCommand]
+    private void SkipOnboarding()
+    {
+        IsOnboardingActive = false;
+        _onboardingStateService.MarkSeen();
+    }
+
     [RelayCommand(CanExecute = nameof(IsShaderLoaded))]
     private void TogglePlayback()
     {
@@ -2130,6 +2249,54 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ForceShaderLanguage(value.Value);
     }
 
+    /// <summary>
+    /// Remplace intégralement <see cref="ShaderIssues"/> et recalcule
+    /// <see cref="AvailablePassNames"/> (Phase v1.8.0) — appelé par les deux
+    /// points où la liste des problèmes shader est reconstruite
+    /// (<see cref="LoadShaderFile"/>, <see cref="ForceShaderLanguage"/>).
+    /// Préserve l'état de sélection (<see cref="ShaderIssuePassFilterViewModel.IsSelected"/>)
+    /// des noms de passe déjà présents avant le remplacement, pour qu'un
+    /// filtre par passe actif ne soit pas silencieusement réinitialisé à
+    /// chaque recompilation.
+    /// </summary>
+    private void ReplaceShaderIssues(IReadOnlyList<Videotoy.Core.ShaderModel.ShaderIssue> issues)
+    {
+        var previousSelection = AvailablePassNames.ToDictionary(p => p.PassName, p => p.IsSelected);
+
+        ShaderIssues.Clear();
+        foreach (var issue in issues)
+        {
+            ShaderIssues.Add(ShaderIssueViewModel.FromIssue(issue));
+        }
+
+        AvailablePassNames.Clear();
+        foreach (var passName in ShaderIssues.Select(i => i.PassName).Distinct().OrderBy(name => name))
+        {
+            var passFilter = new ShaderIssuePassFilterViewModel
+            {
+                PassName = passName,
+                IsSelected = !previousSelection.TryGetValue(passName, out var wasSelected) || wasSelected
+            };
+            passFilter.PropertyChanged += (_, _) => ShaderIssuesFilterChanged?.Invoke(this, EventArgs.Empty);
+            AvailablePassNames.Add(passFilter);
+        }
+
+        ShaderIssuesFilterChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Levé chaque fois que <see cref="ShaderIssues"/>/<see cref="AvailablePassNames"/>
+    /// sont recalculés ou qu'une bascule de filtre change — le code-behind
+    /// s'y abonne pour rafraîchir la <c>CollectionViewSource</c> dont le
+    /// filtre ne peut pas être exprimé par binding déclaratif (Phase
+    /// v1.8.0).
+    /// </summary>
+    public event EventHandler? ShaderIssuesFilterChanged;
+
+    partial void OnShowErrorIssuesChanged(bool value) => ShaderIssuesFilterChanged?.Invoke(this, EventArgs.Empty);
+
+    partial void OnShowWarningIssuesChanged(bool value) => ShaderIssuesFilterChanged?.Invoke(this, EventArgs.Empty);
+
     private void ForceShaderLanguage(Videotoy.Core.ShaderModel.ShaderSourceLanguage language)
     {
         if (_loadedShader is null)
@@ -2141,11 +2308,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             var reloaded = _shaderFileService.ReloadWithLanguageOverride(_loadedShader, language);
 
-            ShaderIssues.Clear();
-            foreach (var issue in reloaded.Issues)
-            {
-                ShaderIssues.Add(ShaderIssueViewModel.FromIssue(issue));
-            }
+            ReplaceShaderIssues(reloaded.Issues);
 
             IsIssuesPanelOpen = ShaderIssues.Count > 0;
 
@@ -2192,11 +2355,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SelectedShaderLanguage = ShaderLanguageOption.FromLanguage(loadedShader.Project.SourceLanguage);
             _suppressShaderLanguageOverride = false;
 
-            ShaderIssues.Clear();
-            foreach (var issue in loadedShader.Issues)
-            {
-                ShaderIssues.Add(ShaderIssueViewModel.FromIssue(issue));
-            }
+            ReplaceShaderIssues(loadedShader.Issues);
 
             IsIssuesPanelOpen = ShaderIssues.Count > 0;
             LoadedShaderName = loadedShader.Project.Title;

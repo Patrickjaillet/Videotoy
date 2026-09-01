@@ -16,6 +16,10 @@
     <Geometry x:Key="IconLoop">M4,10 A8,8 0 0 1 20,10 M20,10 L20,5 M20,10 L16,8 M20,14 A8,8 0 0 1 4,14 M4,14 L4,19 M4,14 L8,16</Geometry>
     <Geometry x:Key="IconUndo">M7,7 L3,11 L7,15 M3,11 L15,11 A6,6 0 1 1 15,23</Geometry>
     <Geometry x:Key="IconRedo">M17,7 L21,11 L17,15 M21,11 L9,11 A6,6 0 1 0 9,23</Geometry>
+    <Geometry x:Key="IconWarning">M12,3 L22,20 L2,20 Z M12,9 L12,14.5 M12,17 L12,17.1</Geometry>
+    <Geometry x:Key="IconError">M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M9,9 L15,15 M15,9 L9,15</Geometry>
+    <Geometry x:Key="IconFilter">M3,4 L21,4 L14,12.5 L14,19 L10,21 L10,12.5 Z</Geometry>
+    <Geometry x:Key="IconRenderQueue">M4,5 L4,19 L20,19 L20,5 Z M4,9 L20,9 M8,13 L16,13 M8,16 L13,16</Geometry>
 
     <Style x:Key="VectorIconStyle" TargetType="Path">
         <Setter Property="Stretch" Value="Uniform" />

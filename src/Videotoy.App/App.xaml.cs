@@ -112,6 +112,7 @@ public partial class App : Application
         services.AddSingleton<ExportHistoryService>();
         services.AddSingleton<RenderQueueService>();
         services.AddSingleton<LoopSettingsService>();
+        services.AddSingleton<OnboardingStateService>();
         services.AddSingleton<LocalizationService>();
 
         services.AddSingleton<BoundAssetsBuilder>();

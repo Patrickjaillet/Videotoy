@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -26,6 +27,34 @@ public partial class MainWindow : Window
         Unloaded += OnUnloaded;
         DragEnter += OnDragEnter;
         Drop += OnFileDropped;
+
+        var shaderIssuesView = ((CollectionViewSource)Resources["ShaderIssuesViewSource"]).View;
+        shaderIssuesView.Filter = OnShaderIssuesFilter;
+        _viewModel.ShaderIssuesFilterChanged += (_, _) => shaderIssuesView.Refresh();
+    }
+
+    /// <summary>
+    /// Predicate backing the Shader Issues panel's severity/pass filter
+    /// chips (Phase v1.8.0) — an <see cref="System.Windows.Data.ICollectionView"/>
+    /// Filter is a plain delegate, not declaratively bindable, so it reads
+    /// current filter state directly off <see cref="_viewModel"/> each time
+    /// it runs.
+    /// </summary>
+    private bool OnShaderIssuesFilter(object item)
+    {
+        if (item is not ShaderIssueViewModel issue)
+        {
+            return true;
+        }
+
+        var severityMatches = issue.IsError ? _viewModel.ShowErrorIssues : _viewModel.ShowWarningIssues;
+        if (!severityMatches)
+        {
+            return false;
+        }
+
+        var passFilter = _viewModel.AvailablePassNames.FirstOrDefault(p => p.PassName == issue.PassName);
+        return passFilter is null || passFilter.IsSelected;
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -209,6 +238,69 @@ public partial class MainWindow : Window
     {
         WindowChromeHelper.ApplyMicaBackdrop(this);
         CompositionTarget.Rendering += OnPreviewCompositionRendering;
+
+        _viewModel.PropertyChanged += OnViewModelPropertyChangedForOnboarding;
+        _viewModel.StartOnboardingIfFirstLaunch();
+        if (_viewModel.IsOnboardingActive)
+        {
+            UpdateOnboardingStep();
+        }
+    }
+
+    /// <summary>
+    /// Repositions the onboarding overlay's highlight/callout whenever the
+    /// active step changes or the overlay is (re)opened (Phase v1.8.0) —
+    /// computing a target Rect via TranslatePoint is view geometry, so this
+    /// logic lives in code-behind rather than the ViewModel.
+    /// </summary>
+    private void OnViewModelPropertyChangedForOnboarding(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MainWindowViewModel.IsOnboardingActive) or nameof(MainWindowViewModel.CurrentOnboardingStepIndex))
+        {
+            if (_viewModel.IsOnboardingActive)
+            {
+                UpdateOnboardingStep();
+            }
+        }
+    }
+
+    private void UpdateOnboardingStep()
+    {
+        var (target, titleKey, bodyKey) = _viewModel.CurrentOnboardingStepIndex switch
+        {
+            0 => ((FrameworkElement)ViewportRegion, "onboarding.step1.title", "onboarding.step1.body"),
+            1 => (SettingsPanelRegion, "onboarding.step2.title", "onboarding.step2.body"),
+            _ => ((FrameworkElement)RenderQueueToolbarButton, "onboarding.step3.title", "onboarding.step3.body")
+        };
+
+        OnboardingStepTitle.Text = Localization.LocalizationRuntime.Service.GetString(titleKey);
+        OnboardingStepBody.Text = Localization.LocalizationRuntime.Service.GetString(bodyKey);
+        OnboardingStepCounter.Text = $"{_viewModel.CurrentOnboardingStepIndex + 1} / {MainWindowViewModel.OnboardingStepCount}";
+
+        var isLastStep = _viewModel.CurrentOnboardingStepIndex == MainWindowViewModel.OnboardingStepCount - 1;
+        OnboardingNextButton.Content = Localization.LocalizationRuntime.Service.GetString(
+            isLastStep ? "onboarding.next.done" : "onboarding.next");
+
+        if (!target.IsLoaded || target.ActualWidth <= 0 || target.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        var topLeft = target.TranslatePoint(new Point(0, 0), OnboardingOverlay);
+        var bounds = new Rect(topLeft, new Size(target.ActualWidth, target.ActualHeight));
+
+        OnboardingHighlight.Margin = new Thickness(bounds.Left - 4, bounds.Top - 4, 0, 0);
+        OnboardingHighlight.Width = bounds.Width + 8;
+        OnboardingHighlight.Height = bounds.Height + 8;
+
+        var calloutLeft = Math.Min(Math.Max(bounds.Left, 16), Math.Max(16, OnboardingOverlay.ActualWidth - OnboardingCallout.Width - 16));
+        var calloutTop = bounds.Bottom + 12;
+        if (calloutTop + 160 > OnboardingOverlay.ActualHeight)
+        {
+            calloutTop = Math.Max(16, bounds.Top - 172);
+        }
+
+        OnboardingCallout.Margin = new Thickness(calloutLeft, calloutTop, 0, 0);
     }
 
     private void OnTitleBarDrag(object sender, MouseButtonEventArgs e)

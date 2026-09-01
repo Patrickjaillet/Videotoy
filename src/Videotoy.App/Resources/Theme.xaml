@@ -37,6 +37,37 @@
     <Duration x:Key="FastDuration">0:0:0.12</Duration>
     <Duration x:Key="MediumDuration">0:0:0.22</Duration>
 
+    <!--
+        Visible keyboard focus (Phase v1.8.0, accessibility pass). WPF's
+        default focus adorner (a dotted rectangle) is invisible on several
+        controls whose templates are fully replaced elsewhere in this file
+        (IconButtonStyle/PrimaryButtonStyle/SecondaryButtonStyle/
+        FieldComboBoxStyle each add their own explicit IsKeyboardFocused
+        border trigger instead — see those styles). This resource covers
+        every other control (CheckBox, RadioButton, Slider, MenuItem, etc.)
+        that still relies on the standard adorner layer, applied globally
+        via the implicit Style below so it reaches every window that merges
+        this dictionary without per-control opt-in.
+    -->
+    <Style x:Key="DefaultFocusVisualStyle">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Rectangle Margin="-2"
+                               StrokeThickness="2"
+                               Stroke="{StaticResource AccentBrush}"
+                               RadiusX="3"
+                               RadiusY="3"
+                               SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="Control">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource DefaultFocusVisualStyle}" />
+    </Style>
+
     <Style x:Key="IconButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -48,12 +79,17 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Root"
                             Background="{TemplateBinding Background}"
+                            BorderBrush="Transparent"
+                            BorderThickness="1.5"
                             CornerRadius="6">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Root" Property="Background" Value="{StaticResource SurfaceAltBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -73,6 +109,8 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Root"
                             Background="{TemplateBinding Background}"
+                            BorderBrush="Transparent"
+                            BorderThickness="2"
                             CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -84,6 +122,90 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Root" Property="Background" Value="{StaticResource AccentPressedBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource TextPrimaryBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        A hyperlink-styled Button — visually identical to the plain
+        TextBlock+MouseBinding links used before Phase v1.8.0 (e.g. the
+        About window's email/website rows), but keyboard-focusable/
+        activatable (Enter/Space), since a MouseBinding on a TextBlock has
+        no keyboard equivalent at all.
+    -->
+    <!--
+        Compact pill-shaped filter chip (Phase v1.8.0) — used by the Shader
+        Issues panel's severity/pass filter row. Checked = included in the
+        filter (visible in the list); unchecked = excluded.
+    -->
+    <Style x:Key="FilterChipStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="12"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Setter Property="Foreground" Value="White" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Effect" Value="{StaticResource AccentGlow}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="LinkButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Padding" Value="2" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="Transparent"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource AccentHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -113,6 +235,9 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Root" Property="Background" Value="{StaticResource SurfaceAltBrush}" />
                         </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -138,6 +263,89 @@
         <Setter Property="FontSize" Value="12" />
     </Style>
 
+    <!--
+        Header row for a thematic collapsible section in the render-settings
+        panel (Phase v1.8.0) — a ToggleButton so the chevron is a real,
+        keyboard-reachable tab stop rather than a mouse-only affordance.
+        IsChecked = expanded. The chevron rotates 90 degrees (pointing right
+        when collapsed, down when expanded) via a one-shot RenderTransform
+        DataTrigger — deliberately not a continuous animation, consistent
+        with the v1.8.0 animation-performance audit's "don't add more
+        continuous motion" principle.
+    -->
+    <Style x:Key="CollapsibleGroupHeaderStyle" TargetType="ToggleButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Root" Background="Transparent" Padding="0,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Path x:Name="Chevron"
+                                  Grid.Column="0"
+                                  Data="{StaticResource IconChevronRight}"
+                                  Style="{StaticResource VectorIconStyle}"
+                                  Width="10"
+                                  Height="10"
+                                  Margin="0,0,6,0"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0" />
+                                </Path.RenderTransform>
+                            </Path>
+                            <TextBlock Grid.Column="1"
+                                       Text="{TemplateBinding Content}"
+                                       Style="{StaticResource LabelStyle}"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Chevron"
+                                                          Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                          To="90"
+                                                          Duration="{StaticResource FastDuration}" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Chevron"
+                                                          Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                          To="0"
+                                                          Duration="{StaticResource FastDuration}" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="Root" Property="BorderThickness" Value="1" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Base (non-animated) progress bar style — used everywhere multiple
+        instances can be on screen simultaneously (e.g. one per render-queue
+        row, Phase v1.5.0+), so no continuous animation runs per instance.
+        See PulsingExportProgressBarStyle for the single-instance variant
+        that keeps the "alive" pulse (Phase v1.8.0 animation-performance
+        audit: a filled bar already conveys progress on its own, so the
+        pulse's signal value per row is low while its aggregate compositing
+        cost scales with however many rows are queued).
+    -->
     <Style x:Key="ExportProgressBarStyle" TargetType="ProgressBar">
         <Setter Property="Height" Value="8" />
         <Setter Property="Minimum" Value="0" />
@@ -145,6 +353,29 @@
         <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}" />
         <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
         <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                        <Grid x:Name="PART_Track">
+                            <Border x:Name="PART_Indicator"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="4"
+                                    HorizontalAlignment="Left" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Single-instance variant retaining the continuous "alive" pulse —
+        reserved for the one primary/main export progress bar (Phase
+        v1.8.0), where the animation's signal value is highest and only one
+        instance ever runs at a time.
+    -->
+    <Style x:Key="PulsingExportProgressBarStyle" TargetType="ProgressBar" BasedOn="{StaticResource ExportProgressBarStyle}">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
@@ -363,6 +594,9 @@
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.6" />
                         </Trigger>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="ToggleButton" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -559,17 +793,6 @@
         </DoubleAnimation>
     </Storyboard>
 
-    <!--
-        Continuous rotation applied to the export progress ring's indicator
-        arc so, combined with the ring's Angle sweep, the render feels alive
-        even at 0% or 100% progress rather than a static dashed circle.
-    -->
-    <Storyboard x:Key="RenderRingSpinStoryboard" RepeatBehavior="Forever">
-        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                          From="0"
-                          To="360"
-                          Duration="0:0:2.6" />
-    </Storyboard>
 
     <Style x:Key="ToastCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />

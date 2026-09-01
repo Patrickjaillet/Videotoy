@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-01
+
+### Added
+
+- The render-settings panel is now organized into 5 thematic collapsible
+  sections (Resolution/FPS, Duration/Loop, Codec/Container, Inputs, Render
+  Queue), absorbing the settings accumulated since v1.0.0; a slim shortcut
+  card in the Render Queue section links to the full queue panel without
+  duplicating its state
+- Keyboard accessibility pass across all windows: a visible focus outline
+  (previously only `TextBox` had one), explicit tab order per region, and
+  the About window's email/website links converted from mouse-only text to
+  keyboard-focusable buttons
+- A first-launch guided onboarding overlay (viewport, settings panel,
+  render queue), replayable anytime from Help > "Show onboarding again"
+- Shader Issues panel redesign: filter chips by severity (error/warning)
+  and by pass (Image/Buffer A-D), plus a warning/error icon on every row
+  (previously color-only)
+- A new quick-action toolbar row consolidating the most frequent actions
+  (open, export, undo/redo, panel toggles); fixes a real discoverability
+  gap where Undo/Redo were unreachable whenever the settings panel was
+  collapsed
+- Icon consistency pass: every icon now goes through the shared
+  `VectorIconStyle`, new icons added for the render queue, filters, and
+  issue severity
+
+### Changed
+
+- Render-queue item rows no longer run a continuous pulse animation on
+  their individual progress bars (kept only on the single main export
+  progress bar); the splash window's logo spin animation was removed,
+  reducing its concurrent continuous animations from 3 to 2 — both changes
+  from this phase's animation-performance audit
+
 ## [1.7.0] - 2026-09-01
 
 ### Added

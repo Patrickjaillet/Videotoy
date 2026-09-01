@@ -12,6 +12,17 @@
   "menu.render.exportMp4": "Export to MP4...",
   "menu.help": "Help",
   "menu.help.about": "About",
+  "menu.help.replayOnboarding": "Show onboarding again",
+
+  "onboarding.skip": "Skip",
+  "onboarding.next": "Next",
+  "onboarding.next.done": "Done",
+  "onboarding.step1.title": "Preview viewport",
+  "onboarding.step1.body": "Your shader renders here in real time. Drag a shader file onto the viewport, or use File > Open, to get started.",
+  "onboarding.step2.title": "Render settings",
+  "onboarding.step2.body": "Resolution, frame rate, codec, and more are grouped into collapsible sections here. Click a section header to expand or collapse it.",
+  "onboarding.step3.title": "Render queue",
+  "onboarding.step3.body": "Queue up multiple exports and let them render one after another. Add the current export from the settings panel's Render Queue section, or from the toolbar.",
 
   "viewport.dropHint": "Drop a shader file here",
   "viewport.shaderLoaded.previewPending": "Preview rendering will be available in a future version",
@@ -26,6 +37,8 @@
 
   "issues.panel.title": "Shader Issues",
   "issues.panel.close": "Close",
+  "issues.filter.errors": "Errors",
+  "issues.filter.warnings": "Warnings",
   "issues.panel.line": "Line {0}",
 
   "panel.renderSettings": "Render Settings",
@@ -33,6 +46,16 @@
   "panel.history.redo": "Redo",
 
   "panel.exportKind.sectionLabel": "EXPORT TYPE",
+
+  "panel.group.resolutionFps.sectionLabel": "RESOLUTION / FRAME RATE",
+  "panel.group.durationLoop.sectionLabel": "DURATION / LOOP",
+  "panel.group.codecContainer.sectionLabel": "CODEC / CONTAINER",
+  "panel.group.inputs.sectionLabel": "INPUTS",
+  "panel.group.renderQueue.sectionLabel": "RENDER QUEUE",
+  "panel.group.renderQueue.itemCount": "{0} item(s) queued",
+  "panel.group.renderQueue.openPanel": "Open queue",
+  "panel.group.renderQueue.addVideo": "Add (Video)",
+  "panel.group.renderQueue.addAnimatedImage": "Add (Image)",
 
   "panel.animatedImage.sectionLabel": "ANIMATED IMAGE",
   "panel.animatedImage.gif.colorCount": "Palette size (2-256 colors)",
