@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Videotoy — Rendez vos shaders Shadertoy en vidéo MP4</title>
-<meta name="description" content="Videotoy transforme un shader Shadertoy (GLSL) en fichier MP4, image par image, avec un pipeline de rendu déterministe et FFmpeg embarqué. Pour Windows 11.">
+<title>Videotoy — Turn your Shadertoy shaders into MP4 video</title>
+<meta name="description" content="Videotoy turns a Shadertoy shader (GLSL) into an MP4 file, frame by frame, through a deterministic render pipeline with bundled FFmpeg. For Windows 11.">
 <link rel="icon" type="image/png" href="assets/img/favicon.png">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -495,9 +495,9 @@
       Videotoy
     </a>
     <nav class="nav-links">
-      <a href="#pipeline">Fonctionnement</a>
-      <a href="#fonctionnalites">Fonctionnalités</a>
-      <a href="#telechargement" class="nav-cta">Télécharger</a>
+      <a href="#pipeline">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#download" class="nav-cta">Download</a>
     </nav>
   </div>
 </header>
@@ -509,33 +509,33 @@
     <div class="wrap hero-grid">
       <div>
         <div class="eyebrow"><span class="dot"></span> v1.0.0 · Windows 11</div>
-        <h1>Vos shaders Shadertoy, rendus en <span class="accent">vidéo MP4</span> — image par image.</h1>
+        <h1>Your Shadertoy shaders, rendered as <span class="accent">MP4 video</span> — frame by frame.</h1>
         <p class="lede">
-          Videotoy transforme un shader GLSL en fichier vidéo, à travers un pipeline
-          de rendu entièrement déterministe. Aucune dépendance à la fluidité de votre
-          machine : chaque frame est calculée et encodée exactement comme les précédentes,
-          avec FFmpeg embarqué — rien à installer à côté.
+          Videotoy turns a GLSL shader into a video file through a fully
+          deterministic render pipeline. No dependency on your machine's real-time
+          performance: every frame is computed and encoded exactly like the ones
+          before it, with FFmpeg bundled in — nothing else to install.
         </p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="#telechargement">
+          <a class="btn btn-primary" href="#download">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
-            Télécharger pour Windows 11
+            Download for Windows 11
           </a>
           <a class="btn btn-ghost" href="https://github.com/patrickjaillet/Videotoy" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.4-1.3-5.4-5.9 0-1.3.5-2.4 1.3-3.2-.1-.3-.6-1.6.1-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6.2 0c2.4-1.6 3.4-1.2 3.4-1.2.7 1.6.2 2.9.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.7 5.6-5.4 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3z"/></svg>
-            Code source
+            Source code
           </a>
         </div>
         <div class="hero-meta">
-          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg> Rendu D3D11 hors-écran</span>
-          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg> FFmpeg embarqué</span>
-          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg> Licence MIT</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg> Off-screen D3D11 rendering</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg> FFmpeg bundled in</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg> MIT license</span>
         </div>
       </div>
       <div class="hero-visual">
         <div class="frame">
-          <img src="assets/img/shot-render-panel.png" alt="Fenêtre principale de Videotoy affichant l'aperçu en direct d'un shader fractal et le panneau des paramètres de rendu, en mode boucle parfaite.">
-          <div class="frame-tag">Aperçu en direct — 61.4 IPS</div>
+          <img src="assets/img/shot-render-panel.png" alt="Videotoy main window showing a live preview of a fractal shader and the render settings panel, in perfect loop mode.">
+          <div class="frame-tag">Live preview — 61.4 FPS</div>
         </div>
       </div>
     </div>
@@ -546,49 +546,49 @@
     <div class="wrap">
       <div class="section-head">
         <p class="section-kicker">// pipeline</p>
-        <h2>Trois étapes, du GLSL au fichier livré</h2>
+        <h2>Three steps, from GLSL to delivered file</h2>
         <p class="section-sub">
-          Chaque frame est calculée à partir de son numéro d'image et du FPS cible —
-          jamais de l'horloge système. Le rendu que vous exportez à 23h sur un portable
-          modeste est identique à celui rendu sur une station de travail.
+          Every frame is computed from its frame number and the target FPS —
+          never from the system clock. The render you export at 11pm on a modest
+          laptop is identical to the one rendered on a workstation.
         </p>
       </div>
       <div class="pipeline">
         <div class="pipe-step">
           <div class="pipe-num">01</div>
-          <h3>Charger le shader</h3>
-          <p>Glissez un fichier <code>.glsl</code>, <code>.frag</code> ou un export Shadertoy
-          complet (<code>.json</code>, multi-passes, Buffer A–D) directement sur le viewport.
-          Les erreurs de compilation s'affichent avec numéro de ligne.</p>
+          <h3>Load the shader</h3>
+          <p>Drag a <code>.glsl</code>, <code>.frag</code> file, or a full Shadertoy
+          export (<code>.json</code>, multi-pass, Buffer A–D) straight onto the viewport.
+          Compilation errors show up with their line number.</p>
         </div>
         <div class="pipe-step">
           <div class="pipe-num">02</div>
-          <h3>Régler l'export</h3>
-          <p>Résolution, FPS, codec, durée manuelle ou boucle parfaite calculée au frame
-          près. Un aperçu du raccord de boucle et une estimation du poids du fichier
-          avant même de lancer le rendu.</p>
+          <h3>Set up the export</h3>
+          <p>Resolution, FPS, codec, manual duration or a perfect loop computed to
+          the exact frame. A loop-seam preview and a file-size estimate before you
+          even start rendering.</p>
         </div>
         <div class="pipe-step">
           <div class="pipe-num">03</div>
-          <h3>Exporter en MP4</h3>
-          <p>Les frames sont transmises directement au pipe stdin de FFmpeg — aucune
-          écriture intermédiaire sur le disque. Audio synchronisé et muxé en une seule
-          passe si le shader utilise un <code>iChannel</code> audio.</p>
+          <h3>Export to MP4</h3>
+          <p>Frames are streamed directly into FFmpeg's stdin pipe — no intermediate
+          disk write. Audio is synchronized and muxed in a single pass when the
+          shader uses an audio <code>iChannel</code>.</p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- FEATURE SHOWCASE -->
-  <section id="fonctionnalites">
+  <section id="features">
     <div class="wrap">
       <div class="section-head">
-        <p class="section-kicker">// fonctionnalités</p>
-        <h2>Construit pour la boucle parfaite</h2>
+        <p class="section-kicker">// features</p>
+        <h2>Built for the perfect loop</h2>
         <p class="section-sub">
-          Les shaders génératifs vivent souvent en boucle — fond d'écran, habillage vidéo,
-          installation. Videotoy calcule le raccord au frame près, plutôt que de vous
-          laisser deviner.
+          Generative shaders often live on a loop — wallpaper, video dressing,
+          installation art. Videotoy computes the seam down to the frame, instead
+          of leaving you to guess.
         </p>
       </div>
 
@@ -597,25 +597,25 @@
         <div class="showcase-item">
           <div class="showcase-text">
             <div class="tag-row">
-              <span class="tag">boucle parfaite</span>
+              <span class="tag">perfect loop</span>
               <span class="tag">frame-accurate</span>
             </div>
-            <h3>Un raccord sans saut, sans image dupliquée</h3>
+            <h3>A seamless join, no dropped or duplicate frame</h3>
             <p>
-              Indiquez une durée de boucle en secondes : Videotoy calcule
-              <code>frameCount = round(durée × FPS)</code>, exclut automatiquement la
-              frame de fin identique à la première, et vous prévient si la division
-              n'est pas exacte — avec une correction assistée.
+              Enter a loop duration in seconds: Videotoy computes
+              <code>frameCount = round(duration × FPS)</code>, automatically
+              excludes the closing frame that's identical to the first one, and
+              warns you if the division isn't exact — with an assisted fix.
             </p>
             <ul class="checklist">
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Mode « Durée manuelle » ou « Boucle parfaite »</li>
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Détection heuristique de la période native du shader</li>
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Aperçu côte à côte de la première et dernière frame</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> "Manual duration" or "Perfect loop" mode</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Heuristic detection of the shader's native period</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Side-by-side preview of the first and last frame</li>
             </ul>
           </div>
           <div class="showcase-image">
             <div class="frame">
-              <img src="assets/img/shot-loop-export.png" alt="Panneau d'aperçu du raccord de boucle, des presets d'export, et de l'estimation du nombre de frames et du poids de fichier.">
+              <img src="assets/img/shot-loop-export.png" alt="Loop-seam preview panel, export presets, and frame count / file size estimate.">
             </div>
           </div>
         </div>
@@ -623,24 +623,24 @@
         <div class="showcase-item reverse">
           <div class="showcase-text">
             <div class="tag-row">
-              <span class="tag">résolutions</span>
+              <span class="tag">resolutions</span>
               <span class="tag">presets</span>
             </div>
-            <h3>Du format smartphone au 4K, en un clic</h3>
+            <h3>From phone format to 4K, in one click</h3>
             <p>
-              Preview, SD, HD, Full HD, 4K UHD — et des presets d'aspect prêts à l'emploi
-              pour écran 4:3, écran 16:9 ou smartphone en portrait 9:16. Une résolution
-              personnalisée reste toujours disponible.
+              Preview, SD, HD, Full HD, 4K UHD — plus ready-made aspect presets
+              for 4:3 screen, 16:9 screen, or 9:16 portrait smartphone. A custom
+              resolution is always available too.
             </p>
             <ul class="checklist">
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 24 / 25 / 30 / 60 IPS ou valeur personnalisée</li>
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Codecs H.264 / H.265, contrôle CRF ou bitrate</li>
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Presets d'export sauvegardables en JSON</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 24 / 25 / 30 / 60 FPS or a custom value</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> H.264 / H.265 codecs, CRF or bitrate control</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Export presets saved as JSON</li>
             </ul>
           </div>
           <div class="showcase-image">
             <div class="frame">
-              <img src="assets/img/shot-resolution-presets.png" alt="Sélecteur de résolution déroulant montrant les presets Preview, SD, HD, Full HD, 4K UHD, écran 4:3, écran 16:9, smartphone 9:16 et résolution personnalisée.">
+              <img src="assets/img/shot-resolution-presets.png" alt="Resolution dropdown showing Preview, SD, HD, Full HD, 4K UHD, 4:3 screen, 16:9 screen, 9:16 smartphone, and custom resolution presets.">
             </div>
           </div>
         </div>
@@ -653,39 +653,39 @@
   <section>
     <div class="wrap">
       <div class="section-head">
-        <p class="section-kicker">// sous le capot</p>
-        <h2>Le reste du pipeline</h2>
+        <p class="section-kicker">// under the hood</p>
+        <h2>The rest of the pipeline</h2>
       </div>
       <div class="feature-grid">
         <div class="feature-cell">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-          <h4>Multi-passes</h4>
-          <p>Buffer A/B/C/D et Common avec ping-pong de render targets pour les shaders à feedback.</p>
+          <h4>Multi-pass</h4>
+          <p>Buffer A/B/C/D and Common with ping-pong render targets for feedback shaders.</p>
         </div>
         <div class="feature-cell">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          <h4>Entrées audio</h4>
-          <p>WAV / MP3 / OGG comme source de spectre ou waveform, générée de façon déterministe par frame, puis muxée à l'export.</p>
+          <h4>Audio input</h4>
+          <p>WAV / MP3 / OGG as a spectrum or waveform source, generated deterministically per frame, then muxed on export.</p>
         </div>
         <div class="feature-cell">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v16h16"/><path d="M4 14l4-4 4 3 8-8"/></svg>
-          <h4>Uniforms personnalisés</h4>
-          <p>Sliders générés dynamiquement pour ajuster les uniforms exposés par le shader, en aperçu.</p>
+          <h4>Custom uniforms</h4>
+          <p>Sliders generated dynamically to tweak the uniforms exposed by the shader, live in preview.</p>
         </div>
         <div class="feature-cell">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01"/></svg>
-          <h4>Mode petite config</h4>
-          <p>Rendu strictement séquentiel, sans frame perdue, avec throttling CPU/GPU si nécessaire.</p>
+          <h4>Low-spec mode</h4>
+          <p>Strictly sequential rendering, no dropped frames, with CPU/GPU throttling when needed.</p>
         </div>
         <div class="feature-cell">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3 6 6 1-4.5 4.5L17.5 21 12 17.5 6.5 21l1-7.5L3 9l6-1z"/></svg>
-          <h4>Interface Windows 11</h4>
-          <p>Fenêtre sans chrome natif, effet Mica, MVVM strict, thème clair unique.</p>
+          <h4>Windows 11 interface</h4>
+          <p>Chromeless window, Mica effect, strict MVVM, single light theme.</p>
         </div>
         <div class="feature-cell">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3 12h18"/></svg>
-          <h4>Français / Anglais</h4>
-          <p>Localisation complète avec changement de langue à chaud, sans redémarrage.</p>
+          <h4>French / English</h4>
+          <p>Full localization with hot language switching, no restart required.</p>
         </div>
       </div>
     </div>
@@ -696,20 +696,20 @@
     <div class="wrap">
       <div class="showcase-item">
         <div class="showcase-text">
-          <div class="tag-row"><span class="tag">à propos</span></div>
-          <h3>Une trace claire de qui a fait quoi</h3>
+          <div class="tag-row"><span class="tag">about</span></div>
+          <h3>A clear record of who made what</h3>
           <p>
-            Nom du logiciel, version SemVer, copyright, contact et site web — tout
-            est réuni dans la fenêtre « À propos », accessible depuis le menu Aide.
+            Software name, SemVer version, copyright, contact and website — all
+            gathered in the "About" window, accessible from the Help menu.
           </p>
           <ul class="checklist">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Version affichée selon SemVer strict</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Licence MIT</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Version displayed per strict SemVer</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> MIT license</li>
           </ul>
         </div>
         <div class="showcase-image" style="max-width:340px;">
           <div class="frame">
-            <img src="assets/img/shot-about.png" alt="Fenêtre À propos de Videotoy montrant le logo, la version v0.3.0, le copyright et le sélecteur de langue.">
+            <img src="assets/img/shot-about.png" alt="Videotoy About window showing the logo, the version, the copyright, and the language selector.">
           </div>
         </div>
       </div>
@@ -717,34 +717,34 @@
   </section>
 
   <!-- DOWNLOAD -->
-  <section id="telechargement">
+  <section id="download">
     <div class="wrap">
       <div class="download">
         <div>
-          <p class="section-kicker">// télécharger</p>
-          <h2>Prêt à rendre votre premier shader</h2>
+          <p class="section-kicker">// download</p>
+          <h2>Ready to render your first shader</h2>
           <p class="section-sub" style="margin-bottom:28px;">
-            L'installateur embarque FFmpeg — aucune dépendance externe à installer.
-            Consultez les notes de version avant de mettre à jour un projet existant.
+            The installer bundles FFmpeg — no external dependency to install.
+            Check the release notes before updating an existing project.
           </p>
           <div class="hero-actions" style="margin-bottom:0;">
             <a class="btn btn-primary" href="https://github.com/patrickjaillet/Videotoy/releases/download/v1.0.0/Videotoy-Setup-1.0.0.exe" target="_blank" rel="noopener">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
-              Télécharger v1.0.0 (.exe)
+              Download v1.0.0 (.exe)
             </a>
             <a class="btn btn-ghost" href="https://github.com/patrickjaillet/Videotoy/releases" target="_blank" rel="noopener">
-              Voir toutes les releases
+              See all releases
             </a>
             <a class="btn btn-ghost" href="https://github.com/patrickjaillet/Videotoy/blob/main/CHANGELOG.md" target="_blank" rel="noopener">
-              Notes de version
+              Release notes
             </a>
           </div>
         </div>
         <div class="download-reqs">
-          <div><strong>Version actuelle</strong><br>v1.0.0</div>
-          <div><strong>Système</strong><br>Windows 11 uniquement</div>
-          <div><strong>Installation</strong><br>Installateur Inno Setup, FFmpeg inclus</div>
-          <div><strong>Licence</strong><br>MIT — usage libre, code source ouvert</div>
+          <div><strong>Current version</strong><br>v1.0.0</div>
+          <div><strong>System</strong><br>Windows 11 only</div>
+          <div><strong>Installation</strong><br>Inno Setup installer, FFmpeg included</div>
+          <div><strong>License</strong><br>MIT — free to use, open source</div>
         </div>
       </div>
     </div>
@@ -761,13 +761,13 @@
       </div>
       <div class="footer-meta">
         Copyright © 2026 Patrick JAILLET<br>
-        Tous droits réservés — distribué sous licence MIT
+        All rights reserved — distributed under the MIT license
       </div>
     </div>
     <div class="footer-cols">
       <div class="footer-links-col">
-        <div class="footer-links-col-title">Projet</div>
-        <a href="https://github.com/patrickjaillet/Videotoy" target="_blank" rel="noopener">Code source</a>
+        <div class="footer-links-col-title">Project</div>
+        <a href="https://github.com/patrickjaillet/Videotoy" target="_blank" rel="noopener">Source code</a>
         <a href="https://github.com/patrickjaillet/Videotoy/releases" target="_blank" rel="noopener">Releases</a>
         <a href="https://github.com/patrickjaillet/Videotoy/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
       </div>
