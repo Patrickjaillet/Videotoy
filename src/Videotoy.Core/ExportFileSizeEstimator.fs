@@ -17,17 +17,60 @@ let private bitsPerPixelForCrf (crf: int) : float =
     // reproduce libx264/libx265's actual rate-control curve.
     0.12 - (0.11 * float clamped / 51.0)
 
-let private audioBitsPerSecond = 192_000.0
+/// Coarse, qualitative efficiency multiplier for the video codec itself,
+/// applied to the CRF-based bitrate estimate: H.265 is materially more
+/// efficient than H.264 at the same CRF value for the same perceived
+/// quality. Like `bitsPerPixelForCrf`, this is not a calibrated measurement,
+/// only an order-of-magnitude correction.
+let private codecEfficiencyFactor (codec: VideoCodec) : float =
+    match codec with
+    | H264 -> 1.0
+    | H265 -> 0.5
+
+/// Coarse, qualitative efficiency multiplier for the encoding speed preset:
+/// faster presets (`UltraFast`) trade compression efficiency for speed, so
+/// the same CRF value yields a measurably larger output than at `VerySlow`.
+let private speedPresetEfficiencyFactor (speed: EncodingSpeedPreset) : float =
+    match speed with
+    | UltraFast -> 1.35
+    | SuperFast -> 1.25
+    | VeryFast -> 1.15
+    | Faster -> 1.08
+    | Fast -> 1.03
+    | Medium -> 1.0
+    | Slow -> 0.93
+    | Slower -> 0.88
+    | VerySlow -> 0.82
+
+/// Coarse, qualitative efficiency multiplier for the selected video profile:
+/// a Baseline H.264 profile forgoes B-frames and is measurably less
+/// efficient than High; profile choice is otherwise a secondary factor
+/// compared to `codecEfficiencyFactor`/`speedPresetEfficiencyFactor`.
+let private profileEfficiencyFactor (profile: VideoProfile) : float =
+    match profile with
+    | H264ProfileSelection BaselineProfile -> 1.10
+    | H264ProfileSelection MainProfile -> 1.0
+    | H264ProfileSelection HighProfile -> 0.95
+    | H265ProfileSelection MainProfile265 -> 1.0
+    | H265ProfileSelection Main10Profile265 -> 1.05
+    | NoProfilePreference -> 1.0
 
 /// Estimates the exported file's size in bytes for the given settings and
-/// total frame count, assuming H.264/H.265 constant-rate-factor encoding.
-/// Purely informational (see `bitsPerPixelForCrf`) — meant to populate a
-/// "~X MB" hint next to the frame-count preview, not to guarantee an exact
-/// output size.
+/// total frame count. In `ConstantRateFactor` mode, the baseline
+/// CRF-derived bitrate (see `bitsPerPixelForCrf`) is further adjusted by
+/// coarse, qualitative multipliers accounting for the chosen codec, speed
+/// preset and profile (see `codecEfficiencyFactor`, `speedPresetEfficiencyFactor`,
+/// `profileEfficiencyFactor`) — none of these are calibrated measurements,
+/// only order-of-magnitude corrections. `TargetBitrate` mode is already
+/// exact and unaffected by any of these factors. Purely informational —
+/// meant to populate a "~X MB" hint next to the frame-count preview, not to
+/// guarantee an exact output size.
 let estimateFileSizeBytes
     (resolution: Resolution)
     (frameRate: FrameRate)
     (rateControl: RateControlMode)
+    (codec: VideoCodec)
+    (encoding: EncodingOptions)
     (frameCount: int)
     (includeAudio: bool)
     : float =
@@ -42,9 +85,13 @@ let estimateFileSizeBytes
             | TargetBitrate kbps -> float kbps * 1000.0
             | ConstantRateFactor crf ->
                 let bitsPerPixel = bitsPerPixelForCrf crf
-                bitsPerPixel * pixelsPerFrame * frameRate.Value
+                let baseline = bitsPerPixel * pixelsPerFrame * frameRate.Value
+                baseline
+                * codecEfficiencyFactor codec
+                * speedPresetEfficiencyFactor encoding.Speed
+                * profileEfficiencyFactor encoding.Profile
 
-        let audioBps = if includeAudio then audioBitsPerSecond else 0.0
+        let audioBps = if includeAudio then float encoding.AudioBitrateKbps * 1000.0 else 0.0
         let totalBitsPerSecond = videoBitsPerSecond + audioBps
 
         totalBitsPerSecond * durationSeconds / 8.0

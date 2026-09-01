@@ -12,11 +12,16 @@ type ExportSettingsIssue =
     | OutOfRangeConstantRateFactor of value: int
     | OutOfRangeTargetBitrate of value: int
     | InvalidThrottleDuration of value: int
+    | InvalidGopSize of value: int
+    | OutOfRangeAudioBitrate of value: int
 
 let minConstantRateFactor = 0
 let maxConstantRateFactor = 51
 
 let minTargetBitrateKbps = 100
+
+let minAudioBitrateKbps = 32
+let maxAudioBitrateKbps = 512
 
 /// Convertit le premier problème de validation en une phrase courte,
 /// prête pour l'UI. Exposée comme fonction "friendly" pour que le côté
@@ -33,6 +38,8 @@ let describeIssue (issue: ExportSettingsIssue) : string =
     | OutOfRangeConstantRateFactor crf -> sprintf "The quality setting (CRF %d) is out of range." crf
     | OutOfRangeTargetBitrate kbps -> sprintf "The target bitrate (%d kbps) is too low." kbps
     | InvalidThrottleDuration _ -> "The low-spec mode throttle duration is invalid."
+    | InvalidGopSize gop -> sprintf "The GOP size (%d) must be greater than zero." gop
+    | OutOfRangeAudioBitrate kbps -> sprintf "The audio bitrate (%d kbps) is out of range." kbps
 
 /// Même chose que `describeIssue`, mais pour le premier élément d'une
 /// liste de problèmes de validation — évite au côté C# de manipuler
@@ -75,6 +82,14 @@ let validate (settings: ExportSettings) : ExportSettingsIssue list =
     match settings.Performance with
     | LowSpec ms when ms < 0 -> issues.Add(InvalidThrottleDuration ms)
     | _ -> ()
+
+    match settings.Encoding.GopSize with
+    | Some gop when gop <= 0 -> issues.Add(InvalidGopSize gop)
+    | _ -> ()
+
+    let audioBitrateKbps = settings.Encoding.AudioBitrateKbps
+    if audioBitrateKbps < minAudioBitrateKbps || audioBitrateKbps > maxAudioBitrateKbps then
+        issues.Add(OutOfRangeAudioBitrate audioBitrateKbps)
 
     issues |> List.ofSeq
 
@@ -129,3 +144,56 @@ let resolveThrottleMilliseconds (performance: PerformanceMode) : int =
     match performance with
     | Normal -> 0
     | LowSpec ms -> max 0 ms
+
+/// Nom du preset de vitesse FFmpeg (`-preset`) attendu par les encodeurs
+/// logiciels x264/x265 ; sans effet côté encodeur matériel.
+let resolveSpeedPresetName (speed: EncodingSpeedPreset) : string =
+    match speed with
+    | UltraFast -> "ultrafast"
+    | SuperFast -> "superfast"
+    | VeryFast -> "veryfast"
+    | Faster -> "faster"
+    | Fast -> "fast"
+    | Medium -> "medium"
+    | Slow -> "slow"
+    | Slower -> "slower"
+    | VerySlow -> "veryslow"
+
+let resolveAudioCodecName (codec: AudioCodec) : string =
+    match codec with
+    | Aac -> "aac"
+    | Copy -> "copy"
+
+/// Nom de profil FFmpeg (`-profile:v`) pour le profil demandé, ou chaîne vide
+/// lorsque `NoProfilePreference` est sélectionné : une chaîne vide signale à
+/// l'appelant (côté C#) de ne pas émettre le flag `-profile:v` du tout,
+/// plutôt que de lui faire manipuler l'union F# directement.
+let tryResolveVideoProfileName (profile: VideoProfile) : string =
+    match profile with
+    | H264ProfileSelection BaselineProfile -> "baseline"
+    | H264ProfileSelection MainProfile -> "main"
+    | H264ProfileSelection HighProfile -> "high"
+    | H265ProfileSelection MainProfile265 -> "main"
+    | H265ProfileSelection Main10Profile265 -> "main10"
+    | NoProfilePreference -> ""
+
+let resolveGopSize (gopSize: int option) : System.Nullable<int> =
+    match gopSize with
+    | Some gop -> System.Nullable(gop)
+    | None -> System.Nullable()
+
+let resolvePassModeIsTwoPass (passMode: EncodingPassMode) : bool =
+    match passMode with
+    | SinglePass -> false
+    | TwoPass -> true
+
+/// Clé stable (indépendante de la représentation .NET compilée de l'union
+/// F#) identifiant la préférence d'encodeur matériel, utilisée aussi bien
+/// pour construire les arguments FFmpeg que pour la persistance (journal
+/// d'export, presets).
+let resolveHardwareEncoderPreferenceKey (preference: HardwareEncoderPreference) : string =
+    match preference with
+    | SoftwareOnly -> "software"
+    | PreferNvenc -> "nvenc"
+    | PreferQuickSync -> "qsv"
+    | PreferAmf -> "amf"

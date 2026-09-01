@@ -23,6 +23,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ShaderFileService _shaderFileService;
     private readonly RecentFilesService _recentFilesService;
     private readonly ExportPresetService _exportPresetService;
+    private readonly ExportHistoryService _exportHistoryService;
     private readonly LoopSettingsService _loopSettingsService;
     private readonly LocalizationService _localizationService;
     private readonly MultiPassRenderer _previewRenderer;
@@ -32,6 +33,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private WriteableBitmap? _previewBitmap;
     private LoadedShader? _loadedShader;
+    private string? _loadedShaderFilePath;
     private bool _isScrubbing;
     private CancellationTokenSource? _exportCancellationTokenSource;
 
@@ -49,6 +51,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isSettingsPanelOpen = true;
+
+    [ObservableProperty]
+    private bool _isExportHistoryPanelOpen;
 
     [ObservableProperty]
     private string _loadedShaderName = string.Empty;
@@ -291,6 +296,38 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public IReadOnlyList<FrameRatePresetOption> FrameRatePresets => FrameRatePresetOption.All;
 
+    public IReadOnlyList<VideoCodecOption> VideoCodecOptions => VideoCodecOption.All;
+
+    public IReadOnlyList<SpeedPresetOption> SpeedPresetOptions => SpeedPresetOption.All;
+
+    /// <summary>
+    /// Video profile options applicable to <see cref="SelectedVideoCodec"/>:
+    /// <see cref="VideoProfileOption.None"/> plus either the H.264 or the
+    /// H.265 profile entries, never both — an H.264 profile cannot be
+    /// applied to an H.265 export and vice versa.
+    /// </summary>
+    public IReadOnlyList<VideoProfileOption> VideoProfileOptions =>
+        VideoProfileOption.All
+            .Where(option => option == VideoProfileOption.None || option.IsForH265 == (SelectedVideoCodec == VideoCodecOption.H265))
+            .ToList();
+
+    public IReadOnlyList<HardwareEncoderOption> HardwareEncoderOptions => HardwareEncoderOption.All;
+
+    public IReadOnlyList<AudioCodecOption> AudioCodecOptions => AudioCodecOption.All;
+
+    /// <summary>
+    /// False for <see cref="AudioCodecOption.Copy"/>, which re-uses the
+    /// source audio track's bitrate as-is and therefore ignores
+    /// <see cref="AudioBitrateKbps"/> entirely (FFmpeg's <c>-c:a copy</c>
+    /// accepts no <c>-b:a</c> flag).
+    /// </summary>
+    public bool IsAudioBitrateFieldVisible => SelectedAudioCodec != AudioCodecOption.Copy;
+
+    private RateControlMode ResolveRateControlMode() =>
+        IsTargetBitrateModeEnabled
+            ? RateControlMode.NewTargetBitrate(TargetBitrateKbps)
+            : RateControlMode.NewConstantRateFactor(ConstantRateFactorValue);
+
     [ObservableProperty]
     private bool _isExporting;
 
@@ -321,6 +358,49 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isLowSpecModeEnabled;
 
+    [ObservableProperty]
+    private VideoCodecOption _selectedVideoCodec = VideoCodecOption.H264;
+
+    [ObservableProperty]
+    private bool _isTargetBitrateModeEnabled;
+
+    [ObservableProperty]
+    private int _targetBitrateKbps = 8000;
+
+    [ObservableProperty]
+    private int _constantRateFactorValue = 18;
+
+    [ObservableProperty]
+    private SpeedPresetOption _selectedSpeedPreset = SpeedPresetOption.Medium;
+
+    [ObservableProperty]
+    private VideoProfileOption _selectedVideoProfile = VideoProfileOption.None;
+
+    [ObservableProperty]
+    private bool _isGopSizeEnabled;
+
+    [ObservableProperty]
+    private int _gopSizeValue = 250;
+
+    /// <summary>
+    /// Two-pass FFmpeg encoding: only meaningful in target-bitrate mode
+    /// (<see cref="IsTargetBitrateModeEnabled"/>) — a CRF export already
+    /// reaches its target quality in a single pass. Doubles export wall-clock
+    /// time, since the deterministic frame sequence is rendered twice (see
+    /// <see cref="VideoExportPipeline.RunAsync"/>).
+    /// </summary>
+    [ObservableProperty]
+    private bool _isTwoPassEnabled;
+
+    [ObservableProperty]
+    private HardwareEncoderOption _selectedHardwareEncoder = HardwareEncoderOption.Software;
+
+    [ObservableProperty]
+    private AudioCodecOption _selectedAudioCodec = AudioCodecOption.Aac;
+
+    [ObservableProperty]
+    private int _audioBitrateKbps = 192;
+
     /// <summary>
     /// Vrai lorsque le shader actuellement chargé déclare au moins un
     /// <c>iChannel</c> audio (<c>Music</c>/<c>MusicStream</c>) dont le
@@ -350,6 +430,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<ShaderIssueViewModel> ShaderIssues { get; } = new();
 
     public ObservableCollection<ExportPreset> ExportPresets { get; } = new();
+
+    public ObservableCollection<ExportHistoryEntry> ExportHistory { get; } = new();
+
+    public bool HasExportHistory => ExportHistory.Count > 0;
 
     /// <summary>
     /// Currently visible toast notifications (export success/failure, etc.),
@@ -400,6 +484,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ShaderFileService shaderFileService,
         RecentFilesService recentFilesService,
         ExportPresetService exportPresetService,
+        ExportHistoryService exportHistoryService,
         LoopSettingsService loopSettingsService,
         LocalizationService localizationService,
         MultiPassRenderer previewRenderer,
@@ -409,6 +494,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _shaderFileService = shaderFileService;
         _recentFilesService = recentFilesService;
         _exportPresetService = exportPresetService;
+        _exportHistoryService = exportHistoryService;
         _loopSettingsService = loopSettingsService;
         _localizationService = localizationService;
         _previewRenderer = previewRenderer;
@@ -419,6 +505,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         ReloadRecentShaders();
         ReloadExportPresets();
+        ReloadExportHistory();
         RecalculateExportPreview();
     }
 
@@ -461,6 +548,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         return DurationMode.NewManual(seconds);
     }
+
+    /// <summary>
+    /// Builds the effective <see cref="EncodingOptions"/> from the current
+    /// render settings panel state (encoding speed preset, video profile,
+    /// GOP size, two-pass mode, hardware encoder preference, audio
+    /// codec/bitrate). Mirrors <see cref="ResolveExportResolution"/>/
+    /// <see cref="ResolveDurationMode"/>'s "resolve effective value from
+    /// panel state" pattern.
+    /// </summary>
+    private EncodingOptions ResolveEncodingOptions() =>
+        new(
+            SelectedSpeedPreset.Value,
+            SelectedVideoProfile.Value,
+            IsGopSizeEnabled ? Microsoft.FSharp.Core.FSharpOption<int>.Some(GopSizeValue) : Microsoft.FSharp.Core.FSharpOption<int>.None,
+            IsTwoPassEnabled ? EncodingPassMode.TwoPass : EncodingPassMode.SinglePass,
+            SelectedHardwareEncoder.Value,
+            SelectedAudioCodec.Value,
+            AudioBitrateKbps);
 
     /// <summary>
     /// Applies <see cref="SuggestedLoopDurationSeconds"/> to
@@ -532,7 +637,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ManualDurationValue = ManualDurationValue,
             LoopDurationSeconds = LoopDurationSeconds,
             IsLoopEndFrameExclusive = IsLoopEndFrameExclusive,
-            IsLowSpecModeEnabled = IsLowSpecModeEnabled
+            IsLowSpecModeEnabled = IsLowSpecModeEnabled,
+            VideoCodecKey = SelectedVideoCodec.Key,
+            IsTargetBitrateModeEnabled = IsTargetBitrateModeEnabled,
+            TargetBitrateKbps = TargetBitrateKbps,
+            ConstantRateFactorValue = ConstantRateFactorValue,
+            SpeedPresetKey = SelectedSpeedPreset.Key,
+            VideoProfileKey = SelectedVideoProfile.Key,
+            IsGopSizeEnabled = IsGopSizeEnabled,
+            GopSizeValue = GopSizeValue,
+            IsTwoPassEnabled = IsTwoPassEnabled,
+            HardwareEncoderKey = SelectedHardwareEncoder.Key,
+            AudioCodecKey = SelectedAudioCodec.Key,
+            AudioBitrateKbps = AudioBitrateKbps
         };
 
         _exportPresetService.SaveOrReplace(preset);
@@ -573,6 +690,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         LoopDurationSeconds = preset.LoopDurationSeconds;
         IsLoopEndFrameExclusive = preset.IsLoopEndFrameExclusive;
         IsLowSpecModeEnabled = preset.IsLowSpecModeEnabled;
+        SelectedVideoCodec = VideoCodecOption.FromKey(preset.VideoCodecKey);
+        IsTargetBitrateModeEnabled = preset.IsTargetBitrateModeEnabled;
+        TargetBitrateKbps = preset.TargetBitrateKbps;
+        ConstantRateFactorValue = preset.ConstantRateFactorValue;
+        SelectedSpeedPreset = SpeedPresetOption.FromKey(preset.SpeedPresetKey);
+        SelectedVideoProfile = VideoProfileOption.FromKey(preset.VideoProfileKey);
+        IsGopSizeEnabled = preset.IsGopSizeEnabled;
+        GopSizeValue = preset.GopSizeValue;
+        IsTwoPassEnabled = preset.IsTwoPassEnabled;
+        SelectedHardwareEncoder = HardwareEncoderOption.FromKey(preset.HardwareEncoderKey);
+        SelectedAudioCodec = AudioCodecOption.FromKey(preset.AudioCodecKey);
+        AudioBitrateKbps = preset.AudioBitrateKbps;
 
         StatusMessage = $"Loaded export preset '{preset.Name}'.";
     }
@@ -625,7 +754,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var estimatedBytes = CoreFileSizeEstimator.estimateFileSizeBytes(
             resolution,
             frameRate,
-            RateControlMode.NewConstantRateFactor(18),
+            ResolveRateControlMode(),
+            SelectedVideoCodec.Value,
+            ResolveEncodingOptions(),
             EstimatedTotalFrames,
             HasAudioChannel && IncludeAudioInExport);
 
@@ -643,6 +774,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void ToggleSettingsPanel()
     {
         IsSettingsPanelOpen = !IsSettingsPanelOpen;
+    }
+
+    [RelayCommand]
+    private void ToggleExportHistoryPanel()
+    {
+        IsExportHistoryPanelOpen = !IsExportHistoryPanelOpen;
+    }
+
+    private void ReloadExportHistory()
+    {
+        ExportHistory.Clear();
+        foreach (var entry in _exportHistoryService.Load())
+        {
+            ExportHistory.Add(entry);
+        }
+
+        OnPropertyChanged(nameof(HasExportHistory));
     }
 
     [RelayCommand]
@@ -855,12 +1003,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ResolveDurationMode(frameRate),
             OutputDirectory,
             OutputFileName,
-            VideoCodec.H264,
-            RateControlMode.NewConstantRateFactor(18),
+            SelectedVideoCodec.Value,
+            ResolveRateControlMode(),
             ContainerFormat.Mp4,
             IsLowSpecModeEnabled
                 ? PerformanceMode.NewLowSpec(LowSpecThrottleMillisecondsPerFrame)
-                : PerformanceMode.Normal);
+                : PerformanceMode.Normal,
+            ResolveEncodingOptions());
 
         var validationIssues = Videotoy.Core.ExportSettingsValidator.validate(exportSettings);
         if (!validationIssues.IsEmpty)
@@ -892,13 +1041,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? ResolveExportAudioSourceFilePath(_loadedShader)
             : null;
 
+        var encodingStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var historyResult = ExportHistoryResult.Failed;
+        string? historyErrorSummary = null;
+
         try
         {
             _exportRenderer.Initialize(new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height));
             _exportRenderer.LoadShader(_loadedShader.HlslPasses["Image"].HlslSource);
 
-            await _exportPipeline.RunAsync(exportSettings, progress, _exportCancellationTokenSource.Token, audioSourceFilePath);
+            await _exportPipeline.RunAsync(
+                exportSettings,
+                progress,
+                _exportCancellationTokenSource.Token,
+                audioSourceFilePath,
+                onRetry: attempt => StatusMessage = $"Retrying export (attempt {attempt})...");
 
+            historyResult = ExportHistoryResult.Succeeded;
             StatusMessage = $"Export complete: {outputFilePath}";
             ShowToast(
                 ToastSeverity.Success,
@@ -907,10 +1066,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+            historyResult = ExportHistoryResult.Cancelled;
             StatusMessage = "Export cancelled.";
         }
         catch (FfmpegEncodingException ex)
         {
+            historyResult = ExportHistoryResult.Failed;
+            historyErrorSummary = ex.Diagnosis.Summary;
             HasExportError = true;
             ExportErrorSummary = ex.Diagnosis.Summary;
             StatusMessage = $"Export failed: {ex.Diagnosis.Summary}";
@@ -921,6 +1083,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            historyResult = ExportHistoryResult.Failed;
+            historyErrorSummary = ex.Message;
             HasExportError = true;
             ExportErrorSummary = ex.Message;
             StatusMessage = $"Export failed: {ex.Message}";
@@ -931,10 +1095,49 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         finally
         {
+            encodingStopwatch.Stop();
+            AppendExportHistoryEntry(exportSettings, outputFilePath, encodingStopwatch.Elapsed, historyResult, historyErrorSummary);
+
             IsExporting = false;
             _exportCancellationTokenSource?.Dispose();
             _exportCancellationTokenSource = null;
         }
+    }
+
+    private void AppendExportHistoryEntry(
+        ExportSettings exportSettings,
+        string outputFilePath,
+        TimeSpan encodingDuration,
+        ExportHistoryResult result,
+        string? errorSummary)
+    {
+        var crf = Videotoy.Core.ExportSettingsValidator.tryResolveConstantRateFactor(exportSettings.RateControl);
+        var targetBitrateKbps = Videotoy.Core.ExportSettingsValidator.tryResolveTargetBitrateKbps(exportSettings.RateControl);
+        var rateControlSummary = crf.HasValue
+            ? $"CRF {crf.Value}"
+            : $"{targetBitrateKbps.GetValueOrDefault()} kbps";
+
+        var entry = new ExportHistoryEntry
+        {
+            ShaderFilePath = _loadedShaderFilePath ?? string.Empty,
+            ShaderDisplayName = LoadedShaderName,
+            OutputFilePath = outputFilePath,
+            ResolutionWidth = exportSettings.Resolution.Width,
+            ResolutionHeight = exportSettings.Resolution.Height,
+            FrameRateValue = exportSettings.FrameRate.Value,
+            DurationSeconds = Videotoy.Core.ExportSettingsValidator.resolveDurationSeconds(exportSettings),
+            CodecName = Videotoy.Core.ExportSettingsValidator.resolveCodecName(exportSettings.Codec),
+            RateControlSummary = rateControlSummary,
+            SpeedPresetName = Videotoy.Core.ExportSettingsValidator.resolveSpeedPresetName(exportSettings.Encoding.Speed),
+            HardwareEncoderKey = Videotoy.Core.ExportSettingsValidator.resolveHardwareEncoderPreferenceKey(exportSettings.Encoding.HardwareEncoder),
+            EncodingDuration = encodingDuration,
+            Result = result,
+            ErrorSummary = errorSummary
+        };
+
+        _exportHistoryService.Append(entry);
+        ExportHistory.Insert(0, entry);
+        OnPropertyChanged(nameof(HasExportHistory));
     }
 
     /// <summary>
@@ -1083,6 +1286,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             var loadedShader = _shaderFileService.Load(filePath);
+            _loadedShaderFilePath = filePath;
 
             ShaderIssues.Clear();
             foreach (var issue in loadedShader.Issues)
@@ -1335,6 +1539,51 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnSelectedFrameRatePresetChanged(FrameRatePresetOption value) => RecalculateExportPreview();
 
     partial void OnCustomFrameRateValueChanged(double value) => RecalculateExportPreview();
+
+    partial void OnSelectedVideoCodecChanged(VideoCodecOption value)
+    {
+        // Un profil H.264 ne peut pas s'appliquer à un export H.265 et
+        // inversement : changer de codec réinitialise toujours le profil
+        // sélectionné vers "Default" plutôt que de laisser une combinaison
+        // codec/profil incohérente.
+        SelectedVideoProfile = VideoProfileOption.None;
+        OnPropertyChanged(nameof(VideoProfileOptions));
+        RecalculateExportPreview();
+    }
+
+    partial void OnIsTargetBitrateModeEnabledChanged(bool value)
+    {
+        if (!value)
+        {
+            IsTwoPassEnabled = false;
+        }
+
+        RecalculateExportPreview();
+    }
+
+    partial void OnTargetBitrateKbpsChanged(int value) => RecalculateExportPreview();
+
+    partial void OnConstantRateFactorValueChanged(int value) => RecalculateExportPreview();
+
+    partial void OnSelectedSpeedPresetChanged(SpeedPresetOption value) => RecalculateExportPreview();
+
+    partial void OnSelectedVideoProfileChanged(VideoProfileOption value) => RecalculateExportPreview();
+
+    partial void OnIsGopSizeEnabledChanged(bool value) => RecalculateExportPreview();
+
+    partial void OnGopSizeValueChanged(int value) => RecalculateExportPreview();
+
+    partial void OnIsTwoPassEnabledChanged(bool value) => RecalculateExportPreview();
+
+    partial void OnSelectedHardwareEncoderChanged(HardwareEncoderOption value) => RecalculateExportPreview();
+
+    partial void OnSelectedAudioCodecChanged(AudioCodecOption value)
+    {
+        OnPropertyChanged(nameof(IsAudioBitrateFieldVisible));
+        RecalculateExportPreview();
+    }
+
+    partial void OnAudioBitrateKbpsChanged(int value) => RecalculateExportPreview();
 
     partial void OnIsSeamlessLoopModeEnabledChanged(bool value)
     {

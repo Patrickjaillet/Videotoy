@@ -27,10 +27,18 @@ public sealed record FfmpegEncodingOptions(
     int Height,
     double FrameRate,
     string OutputFilePath,
+    VideoCodec Codec,
     string VideoCodecName,
     int? ConstantRateFactor,
     int? TargetBitrateKbps,
-    FfmpegAudioTrackOptions? AudioTrack)
+    FfmpegAudioTrackOptions? AudioTrack,
+    string SpeedPreset,
+    string VideoProfileName,
+    int? GopSize,
+    bool IsTwoPass,
+    string HardwareEncoderKey,
+    string AudioCodecName,
+    int AudioBitrateKbps)
 {
     public static FfmpegEncodingOptions FromExportSettings(
         ExportSettings settings,
@@ -43,15 +51,32 @@ public sealed record FfmpegEncodingOptions(
                 $"Invalid export settings: {string.Join(", ", issues)}", nameof(settings));
         }
 
+        var targetBitrateKbps = ToNullableInt(Videotoy.Core.ExportSettingsValidator.tryResolveTargetBitrateKbps(settings.RateControl));
+
+        // Le mode deux passes n'a de sens qu'en contrôle de débit ciblé
+        // (TargetBitrate) : en mode CRF, une seule passe suffit déjà à
+        // atteindre la qualité demandée, donc TwoPass est silencieusement
+        // ramené à SinglePass plutôt que de lever une erreur de validation.
+        var isTwoPass = targetBitrateKbps.HasValue
+            && Videotoy.Core.ExportSettingsValidator.resolvePassModeIsTwoPass(settings.Encoding.PassMode);
+
         return new FfmpegEncodingOptions(
             settings.Resolution.Width,
             settings.Resolution.Height,
             settings.FrameRate.Value,
             Videotoy.Core.ExportSettingsValidator.resolveOutputFilePath(settings),
+            settings.Codec,
             Videotoy.Core.ExportSettingsValidator.resolveCodecName(settings.Codec),
             ToNullableInt(Videotoy.Core.ExportSettingsValidator.tryResolveConstantRateFactor(settings.RateControl)),
-            ToNullableInt(Videotoy.Core.ExportSettingsValidator.tryResolveTargetBitrateKbps(settings.RateControl)),
-            audioTrack);
+            targetBitrateKbps,
+            audioTrack,
+            Videotoy.Core.ExportSettingsValidator.resolveSpeedPresetName(settings.Encoding.Speed),
+            Videotoy.Core.ExportSettingsValidator.tryResolveVideoProfileName(settings.Encoding.Profile),
+            ToNullableInt(Videotoy.Core.ExportSettingsValidator.resolveGopSize(settings.Encoding.GopSize)),
+            isTwoPass,
+            Videotoy.Core.ExportSettingsValidator.resolveHardwareEncoderPreferenceKey(settings.Encoding.HardwareEncoder),
+            Videotoy.Core.ExportSettingsValidator.resolveAudioCodecName(settings.Encoding.AudioCodec),
+            settings.Encoding.AudioBitrateKbps);
     }
 
     private static int? ToNullableInt(System.Nullable<int> value) =>

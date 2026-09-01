@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-01
+
+### Added
+
+- Hardware encoder auto-detection (`HardwareEncoderProbe` in
+  `Videotoy.Ffmpeg`): NVENC, Quick Sync and AMF are probed via
+  `ffmpeg -encoders` followed by a short test encode, cached for the
+  application session, with a new "Hardware encoder" selector in the render
+  settings panel. An unavailable or non-functional hardware encoder falls
+  back transparently and automatically to software x264/x265 encoding —
+  never a hard export failure
+- Extended encoding controls in `FfmpegEncodingOptions`/`FfmpegService` and
+  the render settings panel: H.264/H.265 video profile, GOP size, encoding
+  speed preset (`ultrafast` → `veryslow`), and two-pass encoding for
+  target-bitrate exports (`VideoExportPipeline` now re-renders the
+  deterministic frame sequence once per pass rather than buffering frames in
+  memory)
+- Configurable audio codec (AAC or stream copy) and AAC bitrate for the
+  muxed audio track, replacing the previously hardcoded `aac`/`192k`
+- Automatic, capped retry (`VideoExportPipeline`,
+  `TransientFfmpegErrorClassifier`) on transient FFmpeg failures (e.g. a
+  broken pipe), never retrying a user-initiated cancellation, with a status
+  message surfaced to the render settings panel while retrying
+- Browsable export history panel (`ExportHistoryService` in
+  `Videotoy.Media`, persisted to `%AppData%\Videotoy\export-history.json`,
+  capped and pruned like `LoopSettingsService`): records shader, settings,
+  encoding duration and result (succeeded/failed/cancelled) for every
+  completed export
+
+### Changed
+
+- `ExportFileSizeEstimator.estimateFileSizeBytes` now accounts for the
+  selected codec, encoding speed preset and video profile (in addition to
+  resolution/frame rate/rate control), refining the "~X MB" estimate shown
+  in the render settings panel
+- `OffscreenRenderContext.ReadPixelsRgba` now performs a single bulk memory
+  copy of the whole staging texture when the D3D11 row pitch has no padding
+  (the common case), instead of always copying row by row, reducing
+  per-frame CPU overhead on high-resolution exports
+- `ExportPreset` gained the new encoding option fields (codec, rate control,
+  profile, speed preset, GOP, two-pass, hardware encoder, audio
+  codec/bitrate); older saved presets still load, defaulting to this
+  phase's previous fixed behavior (H.264, CRF 18, medium preset, no profile
+  preference, single pass, software encoding, AAC 192k)
+
 ### Fixed
 
 - `Directory.Build.props` / `Videotoy.Core.Version` were still stamped

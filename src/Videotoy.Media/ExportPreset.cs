@@ -44,5 +44,36 @@ public sealed class ExportPreset
 
     public required bool IsLowSpecModeEnabled { get; init; }
 
+    /// <summary>
+    /// Encoding option fields added in v1.1.0. Not <c>required</c> so
+    /// presets saved by an older version — before these options existed —
+    /// still deserialize, defaulting to the same values the export pipeline
+    /// used before this phase (H.264, CRF 18, medium speed preset, no
+    /// profile preference, single pass, software encoding, AAC 192k).
+    /// </summary>
+    public string VideoCodecKey { get; init; } = "H264";
+
+    public bool IsTargetBitrateModeEnabled { get; init; }
+
+    public int TargetBitrateKbps { get; init; } = 8000;
+
+    public int ConstantRateFactorValue { get; init; } = 18;
+
+    public string SpeedPresetKey { get; init; } = "Medium";
+
+    public string VideoProfileKey { get; init; } = "None";
+
+    public bool IsGopSizeEnabled { get; init; }
+
+    public int GopSizeValue { get; init; } = 250;
+
+    public bool IsTwoPassEnabled { get; init; }
+
+    public string HardwareEncoderKey { get; init; } = "Software";
+
+    public string AudioCodecKey { get; init; } = "Aac";
+
+    public int AudioBitrateKbps { get; init; } = 192;
+
     public DateTime SavedUtc { get; init; } = DateTime.UtcNow;
 }

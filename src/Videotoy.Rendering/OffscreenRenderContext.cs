@@ -144,7 +144,18 @@ public sealed class OffscreenRenderContext : IDisposable
     /// <summary>
     /// Lit le contenu de la render target courante en pixels BGRA 8 bits par canal
     /// (format natif de la texture couleur, <c>B8G8R8A8_UNorm</c>), directement
-    /// compatible avec <c>PixelFormats.Bgra32</c> côté WPF sans conversion.
+    /// compatible avec <c>PixelFormats.Bgra32</c> côté WPF sans conversion — il n'y a
+    /// donc aucune conversion de format de pixel à proprement parler dans ce
+    /// pipeline, seulement une recopie mémoire depuis la texture de staging
+    /// mappée. Copie en un seul bloc (<see cref="Buffer.MemoryCopy"/> sur
+    /// toute la surface, déjà vectorisée en interne par le CLR) lorsque le
+    /// pitch de ligne D3D11 ne comporte aucun padding (cas courant), ce qui
+    /// est nettement plus rapide qu'une copie ligne par ligne sur les
+    /// résolutions élevées ; repli sur la copie ligne par ligne uniquement
+    /// lorsqu'un padding existe (largeurs non multiples de l'alignement
+    /// attendu par le driver). Une implémentation SIMD manuelle
+    /// (<c>System.Runtime.Intrinsics</c>) a été jugée inutile : il s'agit
+    /// d'un <c>memcpy</c> pur, déjà optimal via l'intrinsèque du CLR.
     /// </summary>
     public byte[] ReadPixelsRgba()
     {
@@ -157,18 +168,26 @@ public sealed class OffscreenRenderContext : IDisposable
         try
         {
             var rowSizeInBytes = Size.Width * 4;
-            var pixels = new byte[rowSizeInBytes * Size.Height];
+            var totalSizeInBytes = rowSizeInBytes * Size.Height;
+            var pixels = new byte[totalSizeInBytes];
 
             unsafe
             {
                 var sourceBase = (byte*)mapped.DataPointer;
                 fixed (byte* destinationBase = pixels)
                 {
-                    for (var row = 0; row < Size.Height; row++)
+                    if (mapped.RowPitch == rowSizeInBytes)
                     {
-                        var sourceRow = sourceBase + (row * mapped.RowPitch);
-                        var destinationRow = destinationBase + (row * rowSizeInBytes);
-                        Buffer.MemoryCopy(sourceRow, destinationRow, rowSizeInBytes, rowSizeInBytes);
+                        Buffer.MemoryCopy(sourceBase, destinationBase, totalSizeInBytes, totalSizeInBytes);
+                    }
+                    else
+                    {
+                        for (var row = 0; row < Size.Height; row++)
+                        {
+                            var sourceRow = sourceBase + (row * mapped.RowPitch);
+                            var destinationRow = destinationBase + (row * rowSizeInBytes);
+                            Buffer.MemoryCopy(sourceRow, destinationRow, rowSizeInBytes, rowSizeInBytes);
+                        }
                     }
                 }
             }

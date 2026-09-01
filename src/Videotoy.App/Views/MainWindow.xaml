@@ -26,6 +26,8 @@
         <converters:ProgressRingArcConverter x:Key="ProgressRingArcConverter" />
         <converters:ToastSeverityBrushConverter x:Key="ToastSeverityBrushConverter" />
         <converters:ToastSeverityIconConverter x:Key="ToastSeverityIconConverter" />
+        <converters:ExportHistoryResultBrushConverter x:Key="ExportHistoryResultBrushConverter" />
+        <converters:ExportHistoryResultTextConverter x:Key="ExportHistoryResultTextConverter" />
 
         <Storyboard x:Key="ExpandPanelStoryboard">
             <DoubleAnimation Storyboard.TargetName="SettingsPanelColumn"
@@ -151,6 +153,7 @@
                                         <Path Data="{StaticResource IconExport}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
                                     </MenuItem.Icon>
                                 </MenuItem>
+                                <MenuItem Header="{loc:Loc Key=export.history.panel.title}" Command="{Binding ToggleExportHistoryPanelCommand}" />
                             </MenuItem>
                             <MenuItem Header="{loc:Loc Key=menu.help}">
                                 <MenuItem Header="{loc:Loc Key=menu.help.about}" Click="OnAboutClicked">
@@ -237,6 +240,70 @@
                                                    TextWrapping="Wrap"
                                                    Foreground="{Binding IsError, Converter={StaticResource IssueSeverityBrushConverter}}" />
                                     </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <Border DockPanel.Dock="Bottom"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    MaxHeight="220"
+                    Visibility="{Binding IsExportHistoryPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <DockPanel LastChildFill="True">
+                    <Grid DockPanel.Dock="Top" Margin="14,8,14,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{loc:Loc Key=export.history.panel.title}" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleExportHistoryPanelCommand}" ToolTip="{loc:Loc Key=export.history.toggle.collapse}">
+                            <Path Data="{StaticResource IconClose}" Style="{StaticResource VectorIconStyle}" Width="11" Height="11" />
+                        </Button>
+                    </Grid>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="{loc:Loc Key=export.history.empty}"
+                               Style="{StaticResource LabelStyle}"
+                               Margin="14,4,14,10"
+                               Visibility="{Binding HasExportHistory, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="14,0,14,10">
+                        <ItemsControl ItemsSource="{Binding ExportHistory}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimaryBrush}">
+                                                <Run Text="{Binding ShaderDisplayName, Mode=OneWay}" />
+                                                <Run Text=" — " />
+                                                <Run Text="{Binding ResolutionWidth, Mode=OneWay}" />
+                                                <Run Text="x" />
+                                                <Run Text="{Binding ResolutionHeight, Mode=OneWay}" />
+                                                <Run Text=" — " />
+                                                <Run Text="{Binding CodecName, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock FontSize="11"
+                                                       Foreground="{StaticResource TextSecondaryBrush}">
+                                                <Run Text="{loc:Loc Key=export.history.entry.durationLabel}" />
+                                                <Run Text=": " />
+                                                <Run Text="{Binding EncodingDuration, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{Binding Result, Converter={StaticResource ExportHistoryResultBrushConverter}}"
+                                                   Text="{Binding Result, Converter={StaticResource ExportHistoryResultTextConverter}}" />
+                                    </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -489,6 +556,92 @@
                                                  Text="{Binding CustomFrameRateValue, UpdateSourceTrigger=PropertyChanged}"
                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
                                     </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="{loc:Loc Key=panel.encoding.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
+                            <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                <StackPanel>
+                                    <TextBlock Text="{loc:Loc Key=panel.encoding.codec}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding VideoCodecOptions}"
+                                              SelectedItem="{Binding SelectedVideoCodec}"
+                                              DisplayMemberPath="DisplayName"
+                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                    <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.mode}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                    <CheckBox Content="{loc:Loc Key=panel.encoding.rateControl.targetBitrate}"
+                                              IsChecked="{Binding IsTargetBitrateModeEnabled}"
+                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
+                                              Foreground="{StaticResource TextPrimaryBrush}" />
+
+                                    <StackPanel Margin="0,10,0,0"
+                                                Visibility="{Binding IsTargetBitrateModeEnabled, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.crf.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding ConstantRateFactorValue, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                    </StackPanel>
+
+                                    <StackPanel Margin="0,10,0,0"
+                                                Visibility="{Binding IsTargetBitrateModeEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Loc Key=panel.encoding.rateControl.targetBitrate.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding TargetBitrateKbps, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="{loc:Loc Key=panel.encoding.profile}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding VideoProfileOptions}"
+                                              SelectedItem="{Binding SelectedVideoProfile}"
+                                              DisplayMemberPath="DisplayName"
+                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                    <TextBlock Text="{loc:Loc Key=panel.encoding.speed}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SpeedPresetOptions}"
+                                              SelectedItem="{Binding SelectedSpeedPreset}"
+                                              DisplayMemberPath="DisplayName"
+                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                    <CheckBox Content="{loc:Loc Key=panel.encoding.gop.enable}"
+                                              IsChecked="{Binding IsGopSizeEnabled}"
+                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
+                                              Foreground="{StaticResource TextPrimaryBrush}"
+                                              Margin="0,10,0,0" />
+                                    <StackPanel Margin="0,10,0,0"
+                                                Visibility="{Binding IsGopSizeEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Loc Key=panel.encoding.gop.value}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding GopSizeValue, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                    </StackPanel>
+
+                                    <CheckBox Content="{loc:Loc Key=panel.encoding.twoPass.enable}"
+                                              IsChecked="{Binding IsTwoPassEnabled}"
+                                              IsEnabled="{Binding IsTargetBitrateModeEnabled}"
+                                              Foreground="{StaticResource TextPrimaryBrush}"
+                                              Margin="0,10,0,0" />
+                                    <TextBlock Text="{loc:Loc Key=panel.encoding.twoPass.description}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource LabelStyle}"
+                                               Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="{loc:Loc Key=panel.hardwareEncoder.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
+                            <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                <StackPanel>
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding HardwareEncoderOptions}"
+                                              SelectedItem="{Binding SelectedHardwareEncoder}"
+                                              DisplayMemberPath="DisplayName"
+                                              IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                    <TextBlock Text="{loc:Loc Key=panel.hardwareEncoder.description}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource LabelStyle}"
+                                               Margin="0,6,0,0" />
                                 </StackPanel>
                             </Border>
 
@@ -869,6 +1022,21 @@
                                                    TextWrapping="Wrap"
                                                    Style="{StaticResource LabelStyle}"
                                                    Margin="0,6,0,0" />
+
+                                        <TextBlock Text="{loc:Loc Key=panel.audioCodec.label}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                        <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                  ItemsSource="{Binding AudioCodecOptions}"
+                                                  SelectedItem="{Binding SelectedAudioCodec}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsAudioBitrateFieldVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Loc Key=panel.audio.bitrate.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                            <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                     Text="{Binding AudioBitrateKbps, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

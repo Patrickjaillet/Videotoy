@@ -74,6 +74,7 @@ public partial class App : Application
 
         services.AddSingleton<FfmpegLocator>();
         services.AddSingleton<FfmpegIntegrityVerifier>();
+        services.AddSingleton<HardwareEncoderProbe>();
         services.AddSingleton<FfmpegService>();
         services.AddSingleton<IShaderRenderer, D3D11ShaderRenderer>();
         services.AddSingleton<MultiPassRenderer>();
@@ -86,6 +87,7 @@ public partial class App : Application
         services.AddSingleton<ShaderFileService>();
         services.AddSingleton<RecentFilesService>();
         services.AddSingleton<ExportPresetService>();
+        services.AddSingleton<ExportHistoryService>();
         services.AddSingleton<LoopSettingsService>();
         services.AddSingleton<LocalizationService>();
 
