@@ -17,6 +17,7 @@ type ExportSettingsIssue =
     | CodecNotSupportedByContainer of codec: VideoCodec * container: ContainerFormat
     | OddDimensionForCodec of codec: VideoCodec * width: int * height: int
     | InvalidVideoProfileForCodec of codec: VideoCodec
+    | AlphaNotSupportedByCodec of codec: VideoCodec * profile: VideoProfile
 
 let minConstantRateFactor = 0
 let maxConstantRateFactor = 51
@@ -62,6 +63,10 @@ let describeIssue (issue: ExportSettingsIssue) : string =
         sprintf "VP9 requires even width and height (got %dx%d)." w h
     | InvalidVideoProfileForCodec _ ->
         "The selected video profile does not match the selected codec."
+    | AlphaNotSupportedByCodec (ProRes, _) ->
+        "Straight alpha requires the ProRes 4444 profile."
+    | AlphaNotSupportedByCodec (codec, _) ->
+        sprintf "%s does not support a straight alpha channel." (resolveCodecName codec)
 
 /// Même chose que `describeIssue`, mais pour le premier élément d'une
 /// liste de problèmes de validation — évite au côté C# de manipuler
@@ -92,6 +97,17 @@ let isCodecAllowedForContainer (container: ContainerFormat) (codec: VideoCodec) 
     | Mov, (H264 | H265 | ProRes) -> true
     | WebM, Vp9 -> true
     | _ -> false
+
+/// True lorsque `codec` (avec, pour ProRes, le `profile` sélectionné) prend
+/// en charge un canal alpha réellement encodé : ProRes 4444 uniquement (pas
+/// 422/422 HQ, qui n'ont pas de plan alpha) et VP9. H.264/H.265 n'ont aucun
+/// mode alpha standard interopérable et ne sont jamais éligibles.
+let isAlphaSupportedByCodec (codec: VideoCodec) (profile: VideoProfile) : bool =
+    match codec, profile with
+    | ProRes, ProResProfileSelection ProResProfile4444 -> true
+    | ProRes, _ -> false
+    | Vp9, _ -> true
+    | (H264 | H265), _ -> false
 
 let validate (settings: ExportSettings) : ExportSettingsIssue list =
     let issues = ResizeArray<ExportSettingsIssue>()
@@ -154,6 +170,9 @@ let validate (settings: ExportSettings) : ExportSettingsIssue list =
 
     if not profileMatchesCodec then
         issues.Add(InvalidVideoProfileForCodec settings.Codec)
+
+    if settings.AlphaMode = Straight && not (isAlphaSupportedByCodec settings.Codec settings.Encoding.Profile) then
+        issues.Add(AlphaNotSupportedByCodec (settings.Codec, settings.Encoding.Profile))
 
     issues |> List.ofSeq
 
@@ -268,15 +287,41 @@ let tryResolveMuxerName (container: ContainerFormat) : string =
 
 /// Format de pixel (`-pix_fmt`) : yuv420p pour H.264/H.265/VP9 (format par
 /// défaut déjà utilisé par ce pipeline), yuv422p10le pour ProRes 422/422 HQ,
-/// yuv444p10le pour ProRes 4444 (opaque — le canal alpha de la lecture BGRA
-/// est ignoré dans cette phase).
-let resolvePixelFormatName (codec: VideoCodec) (profile: VideoProfile) : string =
-    match codec with
-    | ProRes ->
+/// yuv444p10le pour ProRes 4444. En `AlphaMode.Straight` (validé au préalable
+/// par `isAlphaSupportedByCodec` — jamais appelé ici avec une combinaison
+/// non supportée), le plan alpha de la lecture BGRA est préservé via les
+/// variantes de format de pixel `yuva*` ; en `Opaque`, il est toujours
+/// ignoré comme avant.
+let resolvePixelFormatName (codec: VideoCodec) (profile: VideoProfile) (alphaMode: AlphaMode) : string =
+    match codec, alphaMode with
+    | ProRes, Straight when profile = ProResProfileSelection ProResProfile4444 -> "yuva444p10le"
+    | ProRes, _ ->
         match profile with
         | ProResProfileSelection ProResProfile4444 -> "yuv444p10le"
         | _ -> "yuv422p10le"
-    | H264 | H265 | Vp9 -> "yuv420p"
+    | Vp9, Straight -> "yuva420p"
+    | (H264 | H265 | Vp9), _ -> "yuv420p"
+
+/// True lorsque l'export doit émettre le flag FFmpeg `-auto-alt-ref 0` :
+/// requis par libvpx-vp9 pour encoder un canal alpha réel (`yuva420p`) via un
+/// flux alt-ref dédié — les images de référence alternatives automatiques,
+/// activées par défaut, sont incompatibles avec ce mécanisme.
+let requiresVp9AlphaAltRefFlag (codec: VideoCodec) (alphaMode: AlphaMode) : bool =
+    codec = Vp9 && alphaMode = Straight
+
+/// Clé stable (indépendante de la représentation .NET compilée de l'union
+/// F#) identifiant le mode alpha, utilisée pour la persistance (presets,
+/// file de rendu, historique undo/redo) sans jamais manipuler l'union F#
+/// directement côté C#.
+let resolveAlphaModeKey (alphaMode: AlphaMode) : string =
+    match alphaMode with
+    | Opaque -> "Opaque"
+    | Straight -> "Straight"
+
+let tryResolveAlphaModeFromKey (key: string) : AlphaMode =
+    match key with
+    | "Straight" -> Straight
+    | _ -> Opaque
 
 /// True lorsque `container` prend en charge le flag `-movflags +faststart`
 /// (muxer MP4/MOV) ; sans objet pour le muxer WebM, différent.

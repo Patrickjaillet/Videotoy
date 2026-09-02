@@ -1225,6 +1225,19 @@
                                               DisplayMemberPath="DisplayName"
                                               IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
 
+                                    <StackPanel Visibility="{Binding IsAlphaSectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Loc Key=panel.encoding.alpha}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                        <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                  ItemsSource="{Binding AlphaModeOptions}"
+                                                  SelectedItem="{Binding SelectedAlphaMode}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+                                        <TextBlock Text="{loc:Loc Key=panel.encoding.alpha.description}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,6,0,0" />
+                                    </StackPanel>
+
                                     <StackPanel Visibility="{Binding IsSpeedPresetVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                                         <TextBlock Text="{loc:Loc Key=panel.encoding.speed}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
                                         <ComboBox Style="{StaticResource FieldComboBoxStyle}"

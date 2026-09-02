@@ -102,6 +102,8 @@
   "panel.encoding.rateControl.targetBitrate": "Target bitrate",
   "panel.encoding.rateControl.targetBitrate.label": "Target bitrate (kbps)",
   "panel.encoding.profile": "Profile",
+  "panel.encoding.alpha": "Alpha channel",
+  "panel.encoding.alpha.description": "Straight alpha preserves the shader's transparency into the exported file — only available with ProRes 4444 or VP9. A shader that never writes its own alpha renders fully opaque either way.",
   "panel.encoding.speed": "Encoding speed",
   "panel.encoding.speed.ultrafast": "Ultra fast",
   "panel.encoding.speed.superfast": "Super fast",

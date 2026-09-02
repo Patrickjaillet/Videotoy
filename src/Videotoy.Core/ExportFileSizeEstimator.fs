@@ -73,6 +73,18 @@ let private proResBitsPerPixel (profile: VideoProfile) : float =
     | ProResProfileSelection ProResProfile4444 -> 330_000_000.0 / referencePixelsPerSecond
     | _ -> 147_000_000.0 / referencePixelsPerSecond
 
+/// Coarse multiplier accounting for the extra bandwidth a straight alpha
+/// channel adds on top of the color planes. ProRes 4444's bits-per-pixel
+/// constant (see `proResBitsPerPixel`) is Apple's own published reference
+/// rate for that profile and already includes its alpha plane — no
+/// additional factor needed there. VP9's `yuva420p` alpha is encoded as a
+/// second, smaller alt-ref grayscale stream (not a full extra YUV frame),
+/// roughly a third of the base estimate.
+let private alphaMultiplier (codec: VideoCodec) (alphaMode: AlphaMode) : float =
+    match codec, alphaMode with
+    | Vp9, Straight -> 1.35
+    | _ -> 1.0
+
 /// Estimates the exported file's size in bytes for the given settings and
 /// total frame count. In `ConstantRateFactor` mode, the baseline
 /// CRF-derived bitrate (see `bitsPerPixelForCrf`) is further adjusted by
@@ -91,6 +103,7 @@ let estimateFileSizeBytes
     (encoding: EncodingOptions)
     (frameCount: int)
     (includeAudio: bool)
+    (alphaMode: AlphaMode)
     : float =
     if resolution.Width <= 0 || resolution.Height <= 0 || frameRate.Value <= 0.0 || frameCount <= 0 then
         0.0
@@ -104,7 +117,7 @@ let estimateFileSizeBytes
                 proResBitsPerPixel encoding.Profile * pixelsPerFrame * frameRate.Value
             | H264 | H265 | Vp9 ->
                 match rateControl with
-                | TargetBitrate kbps -> float kbps * 1000.0
+                | TargetBitrate kbps -> float kbps * 1000.0 * alphaMultiplier codec alphaMode
                 | ConstantRateFactor crf ->
                     let bitsPerPixel = bitsPerPixelForCrf crf
                     let baseline = bitsPerPixel * pixelsPerFrame * frameRate.Value
@@ -112,6 +125,7 @@ let estimateFileSizeBytes
                     * codecEfficiencyFactor codec
                     * speedPresetEfficiencyFactor encoding.Speed
                     * profileEfficiencyFactor encoding.Profile
+                    * alphaMultiplier codec alphaMode
 
         let audioBps = if includeAudio then float encoding.AudioBitrateKbps * 1000.0 else 0.0
         let totalBitsPerSecond = videoBitsPerSecond + audioBps

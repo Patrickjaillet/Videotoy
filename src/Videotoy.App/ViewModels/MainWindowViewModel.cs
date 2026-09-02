@@ -457,6 +457,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool IsHardwareEncoderSectionVisible =>
         SelectedVideoCodec == VideoCodecOption.H264 || SelectedVideoCodec == VideoCodecOption.H265;
 
+    /// <summary>
+    /// True only when the current codec/profile combination can actually
+    /// carry a straight alpha channel — ProRes 4444 or VP9, per
+    /// <see cref="Videotoy.Core.ExportSettingsValidator.isAlphaSupportedByCodec"/>
+    /// (the single source of truth, never duplicated here). H.264/H.265 and
+    /// every other ProRes profile hide the whole "Alpha" section rather than
+    /// leave a dead "Straight alpha" choice that would only fail at export
+    /// validation.
+    /// </summary>
+    public bool IsAlphaSectionVisible =>
+        Videotoy.Core.ExportSettingsValidator.isAlphaSupportedByCodec(SelectedVideoCodec.Value, SelectedVideoProfile.Value);
+
+    /// <summary>
+    /// Alpha mode options applicable to the current codec/profile: always
+    /// includes <see cref="AlphaModeOption.Opaque"/>, plus
+    /// <see cref="AlphaModeOption.Straight"/> only when
+    /// <see cref="IsAlphaSectionVisible"/> is true.
+    /// </summary>
+    public IReadOnlyList<AlphaModeOption> AlphaModeOptions =>
+        IsAlphaSectionVisible ? AlphaModeOption.All : [AlphaModeOption.Opaque];
+
     private RateControlMode ResolveRateControlMode() =>
         IsTargetBitrateModeEnabled
             ? RateControlMode.NewTargetBitrate(TargetBitrateKbps)
@@ -538,6 +559,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private VideoProfileOption _selectedVideoProfile = VideoProfileOption.None;
+
+    [ObservableProperty]
+    private AlphaModeOption _selectedAlphaMode = AlphaModeOption.Opaque;
 
     [ObservableProperty]
     private bool _isGopSizeEnabled;
@@ -961,6 +985,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ConstantRateFactorValue = ConstantRateFactorValue,
             SpeedPresetKey = SelectedSpeedPreset.Key,
             VideoProfileKey = SelectedVideoProfile.Key,
+            AlphaModeKey = SelectedAlphaMode.Key,
             IsGopSizeEnabled = IsGopSizeEnabled,
             GopSizeValue = GopSizeValue,
             IsTwoPassEnabled = IsTwoPassEnabled,
@@ -1014,6 +1039,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ConstantRateFactorValue = preset.ConstantRateFactorValue;
         SelectedSpeedPreset = SpeedPresetOption.FromKey(preset.SpeedPresetKey);
         SelectedVideoProfile = VideoProfileOption.FromKey(preset.VideoProfileKey);
+        SelectedAlphaMode = AlphaModeOption.FromKey(preset.AlphaModeKey);
         IsGopSizeEnabled = preset.IsGopSizeEnabled;
         GopSizeValue = preset.GopSizeValue;
         IsTwoPassEnabled = preset.IsTwoPassEnabled;
@@ -1091,7 +1117,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 SelectedVideoCodec.Value,
                 ResolveEncodingOptions(),
                 EstimatedTotalFrames,
-                HasAudioChannel && IncludeAudioInExport);
+                HasAudioChannel && IncludeAudioInExport,
+                SelectedAlphaMode.Value);
 
             EstimatedFileSizeText = CoreFileSizeEstimator.formatEstimatedFileSize(estimatedBytes);
         }
@@ -1801,7 +1828,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             IsLowSpecModeEnabled
                 ? PerformanceMode.NewLowSpec(LowSpecThrottleMillisecondsPerFrame)
                 : PerformanceMode.Normal,
-            ResolveEncodingOptions());
+            ResolveEncodingOptions(),
+            SelectedAlphaMode.Value);
 
         var validationIssues = Videotoy.Core.ExportSettingsValidator.validate(exportSettings);
         if (!validationIssues.IsEmpty)
@@ -2849,6 +2877,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
         EndHistoryTransaction();
     }
 
+    partial void OnSelectedVideoProfileChanged(VideoProfileOption value)
+    {
+        // Le profil sélectionné détermine, avec le codec, si un canal alpha
+        // réel est disponible (ProRes 4444 uniquement, pas 422/422 HQ) : un
+        // changement de profil peut donc rendre "Straight alpha" invalide,
+        // auquel cas on retombe sur "Opaque" plutôt que de laisser une
+        // combinaison codec/profil/alpha incohérente.
+        OnPropertyChanged(nameof(IsAlphaSectionVisible));
+        OnPropertyChanged(nameof(AlphaModeOptions));
+
+        if (!AlphaModeOptions.Contains(SelectedAlphaMode))
+        {
+            SelectedAlphaMode = AlphaModeOption.Opaque;
+        }
+
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
+
+    partial void OnSelectedAlphaModeChanged(AlphaModeOption value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
+
     partial void OnIsTargetBitrateModeEnabledChanged(bool value)
     {
         if (!value)
@@ -2873,12 +2926,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     partial void OnSelectedSpeedPresetChanged(SpeedPresetOption value)
-    {
-        RecalculateExportPreview();
-        EndHistoryTransaction();
-    }
-
-    partial void OnSelectedVideoProfileChanged(VideoProfileOption value)
     {
         RecalculateExportPreview();
         EndHistoryTransaction();

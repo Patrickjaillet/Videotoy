@@ -109,6 +109,17 @@ type AudioCodec =
     | Opus
     | Copy
 
+/// Mode alpha de l'export vidéo : `Opaque` (par défaut, comportement
+/// historique) ignore le canal alpha rendu par le shader et émet un flux
+/// opaque standard. `Straight` préserve le canal alpha du shader
+/// jusqu'au flux encodé — n'a d'effet réel qu'avec un couple codec/conteneur
+/// qui le supporte (ProRes 4444 en MOV, VP9 en WebM ; voir
+/// `ExportSettingsValidator.isAlphaSupportedByCodec`), sinon rejeté à la
+/// validation plutôt que silencieusement ignoré.
+type AlphaMode =
+    | Opaque
+    | Straight
+
 type EncodingOptions =
     { Speed: EncodingSpeedPreset
       Profile: VideoProfile
@@ -128,7 +139,8 @@ type ExportSettings =
       RateControl: RateControlMode
       Container: ContainerFormat
       Performance: PerformanceMode
-      Encoding: EncodingOptions }
+      Encoding: EncodingOptions
+      AlphaMode: AlphaMode }
 
 type AnimatedImageFormat =
     | Gif

@@ -44,7 +44,8 @@ public sealed record FfmpegEncodingOptions(
     string PixelFormatName,
     bool SupportsFaststart,
     bool IsRateControlLess,
-    bool IsIntraOnly)
+    bool IsIntraOnly,
+    bool RequiresVp9AlphaAltRefFlag)
 {
     public static FfmpegEncodingOptions FromExportSettings(
         ExportSettings settings,
@@ -91,10 +92,11 @@ public sealed record FfmpegEncodingOptions(
             settings.Encoding.AudioBitrateKbps,
             settings.Container,
             Videotoy.Core.ExportSettingsValidator.tryResolveMuxerName(settings.Container),
-            Videotoy.Core.ExportSettingsValidator.resolvePixelFormatName(settings.Codec, settings.Encoding.Profile),
+            Videotoy.Core.ExportSettingsValidator.resolvePixelFormatName(settings.Codec, settings.Encoding.Profile, settings.AlphaMode),
             Videotoy.Core.ExportSettingsValidator.supportsFaststart(settings.Container),
             Videotoy.Core.ExportSettingsValidator.isRateControlLessCodec(settings.Codec),
-            isIntraOnly);
+            isIntraOnly,
+            Videotoy.Core.ExportSettingsValidator.requiresVp9AlphaAltRefFlag(settings.Codec, settings.AlphaMode));
     }
 
     private static int? ToNullableInt(System.Nullable<int> value) =>

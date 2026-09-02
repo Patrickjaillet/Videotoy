@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-02
+
+### Added
+
+- Export with a straight alpha channel, for ProRes 4444 (MOV, `yuva444p10le`)
+  and VP9 (WebM, `yuva420p`) — a new "Alpha channel" selector appears in the
+  render settings panel only when the current codec/profile combination
+  actually supports it, defaulting to "Opaque" (unchanged behavior)
+  otherwise. `ExportSettingsValidator` rejects an unsupported
+  codec/container/alpha combination before export rather than silently
+  producing an opaque file
+- `Domain.AlphaMode` (`Opaque | Straight`), threaded through
+  `ExportSettings`, the FFmpeg pixel-format resolution
+  (`resolvePixelFormatName`), the render settings panel (undo/redo history,
+  export presets, render queue items), and the file-size estimator (VP9
+  alpha adds a coarse size multiplier; ProRes 4444's existing estimate
+  already accounts for its alpha plane)
+- VP9 alpha export automatically adds the `-auto-alt-ref 0` FFmpeg flag
+  it requires
+
+### Fixed
+
+- The HLSL boilerplate initialized `fragColor` to `(0, 0, 0, 0)` — since the
+  overwhelming majority of Shadertoy shaders never write their own `.a`
+  component, this alpha channel (harmless while always discarded on export,
+  as it was before this phase) would have made every such shader export
+  fully transparent the moment straight-alpha export existed. Changed the
+  zero-init to `(0, 0, 0, 1)`: a shader that never touches `.a` keeps
+  rendering fully opaque exactly as before, and only a shader that
+  explicitly assigns `.a` produces real transparency in a straight-alpha
+  export
+- The application crashed on every launch, on every machine, regardless of
+  GPU — two real WPF/XAML bugs, found once the non-regression test campaign
+  could finally run on real hardware: `MainWindow`'s `CollectionViewSource`
+  never resolved its `Source` binding (a `Window.Resources` binding has no
+  inherited `DataContext` in WPF), and `Theme.xaml`/`Icons.xaml` had a
+  `ResourceDictionary` merge-order cycle. Both fixed; the shared
+  color/shadow/duration palette was extracted into a new `Palette.xaml`,
+  merged first, to break the cycle
+- The About window's `Close` button rendered partially or fully outside the
+  window's fixed 440px height, on every machine — switched to
+  `SizeToContent="Height"` so the window always grows to fit its actual
+  content
+- The MP4 and animated-image (GIF/WebP) toolbar export buttons were
+  visually indistinguishable, both using the same icon — added a dedicated
+  icon for the animated-image export button
+
 ## [2.0.0] - 2026-09-01
 
 Consolidation release. No functional changes of its own beyond the fixes

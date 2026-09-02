@@ -36,6 +36,7 @@ public sealed record ExportSettingsSnapshot(
     int ConstantRateFactorValue,
     SpeedPresetOption SelectedSpeedPreset,
     VideoProfileOption SelectedVideoProfile,
+    AlphaModeOption SelectedAlphaMode,
     bool IsGopSizeEnabled,
     int GopSizeValue,
     bool IsTwoPassEnabled,
@@ -68,6 +69,7 @@ public sealed record ExportSettingsSnapshot(
         viewModel.ConstantRateFactorValue,
         viewModel.SelectedSpeedPreset,
         viewModel.SelectedVideoProfile,
+        viewModel.SelectedAlphaMode,
         viewModel.IsGopSizeEnabled,
         viewModel.GopSizeValue,
         viewModel.IsTwoPassEnabled,
@@ -101,6 +103,7 @@ public sealed record ExportSettingsSnapshot(
         viewModel.ConstantRateFactorValue = ConstantRateFactorValue;
         viewModel.SelectedSpeedPreset = SelectedSpeedPreset;
         viewModel.SelectedVideoProfile = SelectedVideoProfile;
+        viewModel.SelectedAlphaMode = SelectedAlphaMode;
         viewModel.IsGopSizeEnabled = IsGopSizeEnabled;
         viewModel.GopSizeValue = GopSizeValue;
         viewModel.IsTwoPassEnabled = IsTwoPassEnabled;

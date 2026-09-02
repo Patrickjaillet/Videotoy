@@ -102,6 +102,8 @@
   "panel.encoding.rateControl.targetBitrate": "Débit cible",
   "panel.encoding.rateControl.targetBitrate.label": "Débit cible (kbps)",
   "panel.encoding.profile": "Profil",
+  "panel.encoding.alpha": "Canal alpha",
+  "panel.encoding.alpha.description": "L'alpha direct préserve la transparence du shader jusqu'au fichier exporté — disponible uniquement avec ProRes 4444 ou VP9. Un shader qui n'écrit jamais sa propre composante alpha reste rendu entièrement opaque dans tous les cas.",
   "panel.encoding.speed": "Vitesse d'encodage",
   "panel.encoding.speed.ultrafast": "Ultra rapide",
   "panel.encoding.speed.superfast": "Très rapide",

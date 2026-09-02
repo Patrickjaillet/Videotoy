@@ -316,6 +316,15 @@ public sealed class FfmpegService
             yield return options.OutputFilePath + ".passlog";
         }
 
+        if (options.RequiresVp9AlphaAltRefFlag)
+        {
+            // libvpx-vp9 encode un canal alpha réel (yuva420p) via un flux
+            // alt-ref dédié, incompatible avec les images de référence
+            // alternatives automatiques activées par défaut.
+            yield return "-auto-alt-ref";
+            yield return "0";
+        }
+
         yield return "-pix_fmt";
         yield return options.PixelFormatName;
         yield return "-r";

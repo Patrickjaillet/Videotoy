@@ -94,6 +94,25 @@ public sealed record HardwareEncoderOption(string Key, string DisplayName, Hardw
         All.FirstOrDefault(option => option.Key == key) ?? Software;
 }
 
+/// <summary>
+/// Preset entry for the alpha mode toggle. <see cref="Straight"/> is only
+/// offered in the UI when the current codec/profile combination actually
+/// supports it (ProRes 4444 or VP9 — see
+/// <see cref="Videotoy.Core.ExportSettingsValidator.isAlphaSupportedByCodec"/>);
+/// selecting it otherwise is caught by <c>ExportSettingsValidator</c> before
+/// export rather than silently ignored.
+/// </summary>
+public sealed record AlphaModeOption(string Key, string DisplayName, AlphaMode Value)
+{
+    public static readonly AlphaModeOption Opaque = new("Opaque", "Opaque", AlphaMode.Opaque);
+    public static readonly AlphaModeOption Straight = new("Straight", "Straight alpha", AlphaMode.Straight);
+
+    public static readonly IReadOnlyList<AlphaModeOption> All = [Opaque, Straight];
+
+    public static AlphaModeOption FromKey(string key) =>
+        All.FirstOrDefault(option => option.Key == key) ?? Opaque;
+}
+
 public sealed record AudioCodecOption(string Key, string DisplayName, AudioCodec Value)
 {
     public static readonly AudioCodecOption Aac = new("Aac", "AAC", AudioCodec.Aac);

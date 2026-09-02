@@ -20,12 +20,16 @@ let private mainImageSignatureRegex =
 /// côté appelant) et la remplace par le point d'entrée HLSL `PSMain`
 /// attendu par `MultiPassRenderer`, en dérivant `fragCoord` de la position
 /// d'écran D3D (avec inversion Y GL/D3D) et en initialisant `fragColor` à
-/// zéro. Utilisé identiquement par le transpileur GLSL et le transpileur
-/// HLSL natif — seule la source à laquelle la regex est appliquée diffère
-/// (GLSL après réécriture de types, HLSL natif directement). Retourne la
-/// source inchangée avec des noms de variables par défaut
-/// ("fragColor"/"fragCoord") si la signature n'est pas trouvée — l'appelant
-/// est responsable de diagnostiquer cette absence en amont.
+/// `(0, 0, 0, 1)` — alpha opaque par défaut, puisque l'immense majorité des
+/// shaders Shadertoy n'écrivent jamais leur composante `.a` et supposent un
+/// rendu opaque ; seul un shader qui assigne explicitement `.a` produit une
+/// vraie transparence en export alpha (voir `Domain.AlphaMode`). Utilisé
+/// identiquement par le transpileur GLSL et le transpileur HLSL natif —
+/// seule la source à laquelle la regex est appliquée diffère (GLSL après
+/// réécriture de types, HLSL natif directement). Retourne la source
+/// inchangée avec des noms de variables par défaut ("fragColor"/"fragCoord")
+/// si la signature n'est pas trouvée — l'appelant est responsable de
+/// diagnostiquer cette absence en amont.
 let renameMainImage (source: string) : string * string * string =
     let currentMatch = mainImageSignatureRegex.Match(source)
 
@@ -35,7 +39,7 @@ let renameMainImage (source: string) : string * string * string =
         let rewritten =
             mainImageSignatureRegex.Replace(
                 source,
-                sprintf "float4 PSMain(float4 __svPosition : SV_Position) : SV_Target\n{\n    float4 %s = float4(0, 0, 0, 0);\n    float2 %s = float2(__svPosition.x, iResolution.y - __svPosition.y);" outputVar coordVar,
+                sprintf "float4 PSMain(float4 __svPosition : SV_Position) : SV_Target\n{\n    float4 %s = float4(0, 0, 0, 1);\n    float2 %s = float2(__svPosition.x, iResolution.y - __svPosition.y);" outputVar coordVar,
                 1)
         rewritten, outputVar, coordVar
     else

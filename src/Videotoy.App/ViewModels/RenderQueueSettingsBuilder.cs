@@ -57,7 +57,8 @@ public static class RenderQueueSettingsBuilder
             rateControl,
             ContainerFormatOption.FromKey(item.ContainerFormatKey).Value,
             performance,
-            encoding);
+            encoding,
+            AlphaModeOption.FromKey(item.AlphaModeKey).Value);
     }
 
     public static AnimatedImageExportSettings BuildAnimatedImageExportSettings(RenderQueueItem item)
@@ -142,6 +143,7 @@ public static class RenderQueueSettingsBuilder
             ConstantRateFactorValue = viewModel.ConstantRateFactorValue,
             SpeedPresetKey = viewModel.SelectedSpeedPreset.Key,
             VideoProfileKey = viewModel.SelectedVideoProfile.Key,
+            AlphaModeKey = viewModel.SelectedAlphaMode.Key,
             IsGopSizeEnabled = viewModel.IsGopSizeEnabled,
             GopSizeValue = viewModel.GopSizeValue,
             IsTwoPassEnabled = viewModel.IsTwoPassEnabled,

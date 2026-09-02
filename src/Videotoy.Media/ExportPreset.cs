@@ -63,6 +63,8 @@ public sealed class ExportPreset
 
     public string VideoProfileKey { get; init; } = "None";
 
+    public string AlphaModeKey { get; init; } = "Opaque";
+
     public bool IsGopSizeEnabled { get; init; }
 
     public int GopSizeValue { get; init; } = 250;
