@@ -4,7 +4,8 @@
         xmlns:loc="clr-namespace:Videotoy.App.Localization"
         Title="{loc:Loc Key=about.windowTitle}"
         Width="420"
-        Height="440"
+        Height="520"
+        SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -18,7 +19,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
