@@ -35,6 +35,25 @@ eight feature phases:
 
 ### Fixed
 
+- **The application crashed on every launch, on every machine, regardless
+  of GPU.** Found once the non-regression test campaign could finally run
+  on real hardware (this phase's own static review had no way to catch
+  either bug):
+  - `MainWindow`'s constructor read `View` off the `ShaderIssuesViewSource`
+    `CollectionViewSource` (backing the v1.8.0 Shader Issues filter chips)
+    immediately after `InitializeComponent()`, always null: its
+    `Source="{Binding ShaderIssues}"` lived in `Window.Resources`, which
+    has no inherited `DataContext` to bind against in WPF, so the binding
+    never resolved. Fixed by assigning `Source` explicitly from the view
+    model in code-behind instead of via XAML binding.
+  - `App.xaml` merged `Resources/Theme.xaml` before `Resources/Icons.xaml`,
+    but `Theme.xaml`'s `CollapsibleGroupHeaderStyle` (v1.8.0) references
+    `IconChevronRight`/`VectorIconStyle` from `Icons.xaml`, while
+    `Icons.xaml`'s own `VectorIconStyle` references `TextPrimaryBrush` from
+    `Theme.xaml` — a merge-order cycle neither file could satisfy on its
+    own. Fixed by extracting the shared color/shadow/duration palette into
+    a new `Resources/Palette.xaml`, merged first in `App.xaml`, breaking
+    the cycle.
 - The render queue's persisted/in-memory item list has no automatic
   pruning of completed or failed entries — flagged during this phase's
   static review as a known limitation (not fixed here, since auto-pruning

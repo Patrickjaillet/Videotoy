@@ -28,7 +28,9 @@ public partial class MainWindow : Window
         DragEnter += OnDragEnter;
         Drop += OnFileDropped;
 
-        var shaderIssuesView = ((CollectionViewSource)Resources["ShaderIssuesViewSource"]).View;
+        var shaderIssuesViewSource = (CollectionViewSource)Resources["ShaderIssuesViewSource"];
+        shaderIssuesViewSource.Source = _viewModel.ShaderIssues;
+        var shaderIssuesView = shaderIssuesViewSource.View;
         shaderIssuesView.Filter = OnShaderIssuesFilter;
         _viewModel.ShaderIssuesFilterChanged += (_, _) => shaderIssuesView.Refresh();
     }

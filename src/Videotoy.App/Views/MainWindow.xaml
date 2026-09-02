@@ -38,11 +38,13 @@
             Backs the Shader Issues panel's severity/pass filter chips
             (Phase v1.8.0). The Filter predicate is a Predicate<object>
             delegate, not declaratively bindable, so it is wired in
-            code-behind (OnShaderIssuesFilter in MainWindow.xaml.cs) and
-            re-evaluated via View.Refresh() whenever
+            code-behind (MainWindow's constructor + OnShaderIssuesFilter):
+            Source is assigned directly from the view model there, since a
+            resource-dictionary CollectionViewSource has no DataContext to
+            bind against. Refreshed via View.Refresh() whenever
             MainWindowViewModel.ShaderIssuesFilterChanged fires.
         -->
-        <CollectionViewSource x:Key="ShaderIssuesViewSource" Source="{Binding ShaderIssues}" />
+        <CollectionViewSource x:Key="ShaderIssuesViewSource" />
 
         <Storyboard x:Key="ExpandPanelStoryboard">
             <DoubleAnimation Storyboard.TargetName="SettingsPanelColumn"

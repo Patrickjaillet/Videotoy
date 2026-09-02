@@ -1,0 +1,40 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="BackgroundBrush" Color="#FFF5F6F8" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#FFEFF1F4" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF2F6FE4" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF1E5BD1" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#FF17469E" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF1B1D1F" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF6B7075" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#FFE0E2E6" />
+    <SolidColorBrush x:Key="ViewportBackgroundBrush" Color="#FF0C0C0E" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#FFD8483C" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#FF2FA765" />
+
+    <DropShadowEffect x:Key="CardShadow"
+                      Color="#FF1B1D1F"
+                      Opacity="0.10"
+                      BlurRadius="18"
+                      ShadowDepth="3"
+                      Direction="270" />
+
+    <DropShadowEffect x:Key="AccentGlow"
+                      Color="#FF2F6FE4"
+                      Opacity="0.55"
+                      BlurRadius="16"
+                      ShadowDepth="0" />
+
+    <DropShadowEffect x:Key="PopupShadow"
+                      Color="#FF1B1D1F"
+                      Opacity="0.18"
+                      BlurRadius="28"
+                      ShadowDepth="6"
+                      Direction="270" />
+
+    <Duration x:Key="FastDuration">0:0:0.12</Duration>
+    <Duration x:Key="MediumDuration">0:0:0.22</Duration>
+
+</ResourceDictionary>
