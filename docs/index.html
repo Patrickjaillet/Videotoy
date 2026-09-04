@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Videotoy — Turn your Shadertoy shaders into MP4 video</title>
-<meta name="description" content="Videotoy turns a Shadertoy shader (GLSL) into an MP4 file, frame by frame, through a deterministic render pipeline with bundled FFmpeg. For Windows 11.">
+<meta name="description" content="Videotoy turns a Shadertoy shader (GLSL/WGSL/HLSL) into MP4, WebM, ProRes, GIF or WebP, frame by frame, through a deterministic render pipeline with bundled FFmpeg. Alpha-channel export, seamless loops, multi-pass. For Windows 11.">
 <link rel="icon" type="image/png" href="assets/img/favicon.png">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -233,7 +233,8 @@
     background:var(--bg-card);
     box-shadow:0 40px 80px -30px rgba(0,0,0,0.7);
   }
-  .frame img{ display:block; width:100%; }
+  .frame img{ display:block; width:100%; cursor:zoom-in; transition:transform .2s ease; }
+  .frame img:hover{ transform:scale(1.015); }
   .frame-tag{
     position:absolute;
     bottom:14px;
@@ -484,6 +485,62 @@
     margin-bottom:2px;
   }
   .footer-cols{ display:flex; gap:56px; flex-wrap:wrap; }
+
+  /* ---------- Lightbox ---------- */
+  .lightbox{
+    position:fixed;
+    inset:0;
+    z-index:200;
+    background:rgba(6,6,8,0.88);
+    backdrop-filter:blur(6px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:40px;
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .22s ease, visibility 0s linear .22s;
+    cursor:zoom-out;
+  }
+  .lightbox.is-open{
+    opacity:1;
+    visibility:visible;
+    transition:opacity .22s ease, visibility 0s;
+  }
+  .lightbox img{
+    max-width:min(1400px, 92vw);
+    max-height:88vh;
+    width:auto;
+    display:block;
+    border-radius:12px;
+    box-shadow:0 30px 90px -20px rgba(0,0,0,0.8);
+    border:1px solid var(--line);
+    transform:scale(0.94);
+    transition:transform .22s ease;
+    cursor:zoom-out;
+  }
+  .lightbox.is-open img{ transform:scale(1); }
+  .lightbox-close{
+    position:absolute;
+    top:24px;
+    right:28px;
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:background .15s ease, transform .15s ease;
+  }
+  .lightbox-close:hover{ background:var(--bg-card); transform:scale(1.06); }
+  .lightbox-close svg{ width:18px; height:18px; }
+  @media (prefers-reduced-motion: reduce){
+    .lightbox, .lightbox img{ transition:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -508,13 +565,14 @@
   <section class="hero" style="border-top:none; padding-top:88px;">
     <div class="wrap hero-grid">
       <div>
-        <div class="eyebrow"><span class="dot"></span> v2.0.0 · Windows 11</div>
+        <div class="eyebrow"><span class="dot"></span> v2.1.0 · Windows 11</div>
         <h1>Your Shadertoy shaders, rendered as <span class="accent">MP4 video</span> — frame by frame.</h1>
         <p class="lede">
-          Videotoy turns a GLSL shader into a video file through a fully
-          deterministic render pipeline. No dependency on your machine's real-time
-          performance: every frame is computed and encoded exactly like the ones
-          before it, with FFmpeg bundled in — nothing else to install.
+          Videotoy turns a GLSL, WGSL, or HLSL shader into a video file through
+          a fully deterministic render pipeline. No dependency on your machine's
+          real-time performance: every frame is computed and encoded exactly
+          like the ones before it, with FFmpeg bundled in — nothing else to
+          install.
         </p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="#download">
@@ -623,6 +681,31 @@
         <div class="showcase-item reverse">
           <div class="showcase-text">
             <div class="tag-row">
+              <span class="tag">new in v2.1.0</span>
+              <span class="tag">alpha channel</span>
+            </div>
+            <h3>Real transparency for compositing</h3>
+            <p>
+              Export with a genuine straight alpha channel — ProRes 4444
+              (MOV) or VP9 (WebM) — for shaders meant to be composited over
+              other footage instead of always rendering opaque.
+            </p>
+            <ul class="checklist">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> "Opaque" or "Straight alpha" selector, shown only when supported</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Invalid codec/container/alpha combinations rejected before export</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Verified end-to-end with real <code>ffprobe</code> exports</li>
+            </ul>
+          </div>
+          <div class="showcase-image">
+            <div class="frame">
+              <img src="assets/img/shot-render-panel.png" alt="Videotoy render settings panel showing the alpha channel selector for a shader export.">
+            </div>
+          </div>
+        </div>
+
+        <div class="showcase-item">
+          <div class="showcase-text">
+            <div class="tag-row">
               <span class="tag">resolutions</span>
               <span class="tag">presets</span>
             </div>
@@ -676,6 +759,11 @@
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01"/></svg>
           <h4>Low-spec mode</h4>
           <p>Strictly sequential rendering, no dropped frames, with CPU/GPU throttling when needed.</p>
+        </div>
+        <div class="feature-cell">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="2 3"/><path d="M8 8l8 8M16 8l-8 8"/></svg>
+          <h4>Alpha channel</h4>
+          <p>Straight alpha export in ProRes 4444 or VP9, for shaders composited over other footage.</p>
         </div>
         <div class="feature-cell">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3 6 6 1-4.5 4.5L17.5 21 12 17.5 6.5 21l1-7.5L3 9l6-1z"/></svg>
@@ -756,7 +844,7 @@
           </div>
         </div>
         <div class="download-reqs">
-          <div><strong>Current version</strong><br>v2.0.0</div>
+          <div><strong>Current version</strong><br>v2.1.0</div>
           <div><strong>System</strong><br>Windows 11 only</div>
           <div><strong>Installation</strong><br>Inno Setup installer, FFmpeg included</div>
           <div><strong>License</strong><br>MIT — free to use, open source</div>
@@ -793,6 +881,50 @@
     </div>
   </div>
 </footer>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Enlarged screenshot">
+  <button class="lightbox-close" id="lightboxClose" aria-label="Close">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<script>
+(function(){
+  var lightbox = document.getElementById('lightbox');
+  var lightboxImg = document.getElementById('lightboxImg');
+  var closeBtn = document.getElementById('lightboxClose');
+  var lastFocused = null;
+
+  function openLightbox(img){
+    lastFocused = document.activeElement;
+    lightboxImg.src = img.currentSrc || img.src;
+    lightboxImg.alt = img.alt || '';
+    lightbox.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    closeBtn.focus();
+  }
+
+  function closeLightbox(){
+    lightbox.classList.remove('is-open');
+    document.body.style.overflow = '';
+    lightboxImg.src = '';
+    if (lastFocused) lastFocused.focus();
+  }
+
+  document.querySelectorAll('.frame img').forEach(function(img){
+    img.addEventListener('click', function(){ openLightbox(img); });
+  });
+
+  lightbox.addEventListener('click', function(e){
+    if (e.target === lightbox || e.target === lightboxImg) closeLightbox();
+  });
+  closeBtn.addEventListener('click', closeLightbox);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && lightbox.classList.contains('is-open')) closeLightbox();
+  });
+})();
+</script>
 
 </body>
 </html>
