@@ -91,6 +91,7 @@ public partial class App : Application
         services.AddSingleton(sp => new FrameSequenceRenderer(sp.GetRequiredService<ExportMultiPassRenderer>()));
         services.AddSingleton<VideoExportPipeline>();
         services.AddSingleton<AnimatedImageExportPipeline>();
+        services.AddSingleton<ImageSequenceExportPipeline>();
 
         services.AddSingleton<TintLocator>();
         // Contrairement à FfmpegIntegrityVerifier, VerifyOrThrow() n'est

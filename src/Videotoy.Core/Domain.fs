@@ -178,6 +178,48 @@ type AnimatedImageExportSettings =
       Format: AnimatedImageFormat
       Encoding: AnimatedImageEncodingOptions }
 
+/// Format d'une frame de séquence d'images. `Png8` est un export 8-bit
+/// fidèle à la render target D3D11 sous-jacente ; `Png16`/`Tiff16`/`Exr16`
+/// sont produits en **étendant** ce même source 8-bit RGBA sur 16 bits
+/// (multiplication/réplication de chaque canal, pas de nouvelle information),
+/// car le pipeline de rendu est actuellement 8-bit uniquement — une véritable
+/// plage dynamique étendue (HDR linéaire réel) arrivera avec le pipeline de
+/// rendu flottant de la v2.3.0 (voir ROADMAP.md). Ne pas présenter ces
+/// formats 16-bit comme de la vraie HDR tant que ce pipeline n'existe pas.
+type ImageSequenceFormat =
+    | Png8
+    | Png16
+    | Tiff16
+    | Exr16
+
+/// Convention de nommage des fichiers de frame d'une séquence d'images :
+/// `Printf` attend un motif de style `frame_%05d.png` (un seul spécificateur
+/// `%d`-like, validé par `ImageSequenceExportSettingsValidator`) ; `TokenPattern`
+/// attend un motif avec les jetons `{index}`/`{time}`, ex.
+/// `shot_{index}_{time}.png`. Les deux exigent un jeton distinguant chaque
+/// frame (sinon toutes les frames écraseraient le même fichier), rejeté sinon
+/// à la validation.
+type ImageSequenceNamingMode =
+    | Printf of pattern: string
+    | TokenPattern of pattern: string
+
+/// Réglages d'un export séquence d'images, volontairement séparés
+/// d'<see cref="ExportSettings"/> (même logique que <see cref="AnimatedImageExportSettings"/>) :
+/// ni conteneur, ni codec vidéo, ni profil, ni encodeur matériel, ni piste
+/// audio n'ont de sens ici (chaque frame est un fichier image indépendant).
+/// Contrairement à l'image animée, une séquence d'images accepte aussi bien
+/// une durée manuelle qu'une boucle parfaite (`Duration: DurationMode`) : il
+/// n'y a pas de contrainte de bouclage propre au format de sortie.
+type ImageSequenceExportSettings =
+    { Resolution: Resolution
+      FrameRate: FrameRate
+      Duration: DurationMode
+      OutputDirectory: string
+      NamingPattern: ImageSequenceNamingMode
+      Format: ImageSequenceFormat
+      AlphaMode: AlphaMode
+      TiffUseLzwCompression: bool }
+
 type RenderFrame =
     { Index: int
       TimeSeconds: float

@@ -88,6 +88,32 @@ public static class RenderQueueSettingsBuilder
             encoding);
     }
 
+    public static ImageSequenceExportSettings BuildImageSequenceExportSettings(RenderQueueItem item)
+    {
+        var resolutionPreset = ResolutionPresetOption.FromKey(item.ResolutionPresetName);
+        var resolution = resolutionPreset.IsCustom
+            ? new Resolution(Math.Max(0, item.CustomResolutionWidth), Math.Max(0, item.CustomResolutionHeight))
+            : new Resolution(resolutionPreset.Width, resolutionPreset.Height);
+
+        var frameRatePreset = FrameRatePresetOption.FromKey(item.FrameRatePresetName);
+        var frameRate = new FrameRate(frameRatePreset.IsCustom ? item.CustomFrameRateValue : frameRatePreset.Value);
+
+        var durationMode = BuildDurationMode(item, frameRate);
+
+        var namingMode = Videotoy.Core.ImageSequenceExportSettingsValidator.tryResolveNamingPatternFromKey(
+            item.ImageSequenceNamingPatternKey, item.ImageSequenceNamingPattern);
+
+        return new ImageSequenceExportSettings(
+            resolution,
+            frameRate,
+            durationMode,
+            item.OutputDirectory,
+            namingMode,
+            Videotoy.Core.ImageSequenceExportSettingsValidator.tryResolveFormatFromKey(item.ImageSequenceFormatKey),
+            AlphaModeOption.FromKey(item.AlphaModeKey).Value,
+            item.ImageSequenceTiffUseLzwCompression);
+    }
+
     private static DurationMode BuildDurationMode(RenderQueueItem item, FrameRate frameRate)
     {
         if (item.IsSeamlessLoopModeEnabled)
@@ -154,7 +180,12 @@ public static class RenderQueueSettingsBuilder
             GifColorCount = viewModel.GifColorCount,
             GifDitherKey = viewModel.SelectedGifDither.Key,
             WebPQuality = viewModel.WebPQuality,
-            IsWebPLosslessEnabled = viewModel.IsWebPLosslessEnabled
+            IsWebPLosslessEnabled = viewModel.IsWebPLosslessEnabled,
+            ImageSequenceFormatKey = viewModel.SelectedImageSequenceFormat.Key,
+            ImageSequenceNamingPatternKey = viewModel.SelectedImageSequenceNamingMode.Key,
+            ImageSequenceNamingPattern = viewModel.ImageSequenceNamingPattern,
+            ImageSequenceTiffUseLzwCompression = viewModel.IsImageSequenceTiffLzwCompressionEnabled,
+            ImageSequenceResumeIfInterrupted = viewModel.IsImageSequenceResumeEnabled
         };
     }
 }

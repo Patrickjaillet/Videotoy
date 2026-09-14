@@ -227,6 +227,9 @@
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ExportAnimatedImageCommand}" ToolTip="{loc:Loc Key=action.exportAnimatedImage}">
                         <Path Data="{StaticResource IconExportAnimatedImage}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
                     </Button>
+                    <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ExportImageSequenceCommand}" ToolTip="{loc:Loc Key=action.exportImageSequence}">
+                        <Path Data="{StaticResource IconExportImageSequence}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                    </Button>
 
                     <Rectangle Width="1" Height="20" Fill="{StaticResource BorderBrush}" Margin="6,0" />
 
@@ -470,6 +473,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
@@ -486,27 +490,32 @@
                                 Command="{Binding AddCurrentToRenderQueueCommand}"
                                 CommandParameter="{x:Static media:RenderQueueItemKind.AnimatedImage}"
                                 Margin="0,0,6,0" />
+                        <Button Grid.Column="2"
+                                Content="{loc:Loc Key=renderQueue.add.imageSequence}"
+                                Command="{Binding AddCurrentToRenderQueueCommand}"
+                                CommandParameter="{x:Static media:RenderQueueItemKind.ImageSequence}"
+                                Margin="0,0,6,0" />
 
-                        <Button Grid.Column="3"
+                        <Button Grid.Column="4"
                                 Style="{StaticResource IconButtonStyle}"
                                 Command="{Binding StartRenderQueueCommand}"
                                 ToolTip="{loc:Loc Key=renderQueue.start}"
                                 Visibility="{Binding IsRenderQueueRunning, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                             <Path Data="{StaticResource IconPlay}" Style="{StaticResource VectorIconStyle}" Width="12" Height="12" />
                         </Button>
-                        <Button Grid.Column="3"
+                        <Button Grid.Column="4"
                                 Style="{StaticResource IconButtonStyle}"
                                 Command="{Binding PauseRenderQueueCommand}"
                                 ToolTip="{loc:Loc Key=renderQueue.pause}"
                                 Visibility="{Binding IsRenderQueueRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Path Data="{StaticResource IconPause}" Style="{StaticResource VectorIconStyle}" Width="12" Height="12" />
                         </Button>
-                        <Button Grid.Column="4"
+                        <Button Grid.Column="5"
                                 Content="{loc:Loc Key=renderQueue.resume}"
                                 Command="{Binding ResumeRenderQueueCommand}"
                                 Visibility="{Binding IsRenderQueuePaused, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Margin="6,0,0,0" />
-                        <Button Grid.Column="5"
+                        <Button Grid.Column="6"
                                 Style="{StaticResource IconButtonStyle}"
                                 Command="{Binding CancelRenderQueueCommand}"
                                 ToolTip="{loc:Loc Key=renderQueue.cancelAll}"
@@ -1341,6 +1350,75 @@
                                 </Border>
                             </StackPanel>
 
+                            <StackPanel Visibility="{Binding IsImageSequenceExportModeSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="{loc:Loc Key=panel.imageSequence.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
+                                <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                    <StackPanel>
+                                        <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                  ItemsSource="{Binding ImageSequenceFormatOptions}"
+                                                  SelectedItem="{Binding SelectedImageSequenceFormat}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                        <CheckBox Content="{loc:Loc Key=panel.imageSequence.tiffLzw}"
+                                                  IsChecked="{Binding IsImageSequenceTiffLzwCompressionEnabled}"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
+                                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                                  Margin="0,10,0,0"
+                                                  Visibility="{Binding IsTiff16FormatSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                                        <TextBlock Text="{loc:Loc Key=panel.imageSequence.namingMode}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                        <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                                  ItemsSource="{Binding ImageSequenceNamingModeOptions}"
+                                                  SelectedItem="{Binding SelectedImageSequenceNamingMode}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                        <TextBlock Text="{loc:Loc Key=panel.imageSequence.namingPattern}" Style="{StaticResource LabelStyle}" Margin="0,10,0,4" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding ImageSequenceNamingPattern, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
+                                                 GotFocus="OnUndoableTextBoxGotFocus"
+                                                 LostFocus="OnUndoableTextBoxLostFocus"
+                                                 ToolTip="{loc:Loc Key=panel.imageSequence.namingPattern.tooltip}" />
+                                        <TextBlock Text="{loc:Loc Key=panel.imageSequence.namingPattern.hint}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,6,0,0" />
+
+                                        <CheckBox Content="{loc:Loc Key=panel.imageSequence.resume}"
+                                                  IsChecked="{Binding IsImageSequenceResumeEnabled}"
+                                                  IsEnabled="{Binding IsExporting, Converter={StaticResource InverseBooleanConverter}}"
+                                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                                  Margin="0,10,0,0" />
+                                        <TextBlock Text="{loc:Loc Key=panel.imageSequence.resume.description}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,6,0,0" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18"
+                                        Visibility="{Binding IsImageSequenceOverwritePromptVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:LocFormat Key=panel.imageSequence.overwritePrompt.message, Path=ImageSequenceExistingFrameCount}"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,0,0,10" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="{loc:Loc Key=panel.imageSequence.overwritePrompt.resume}"
+                                                    Command="{Binding ResumeImageSequenceExportCommand}"
+                                                    Margin="0,0,8,0" />
+                                            <Button Content="{loc:Loc Key=panel.imageSequence.overwritePrompt.overwrite}"
+                                                    Command="{Binding ConfirmImageSequenceOverwriteCommand}"
+                                                    Margin="0,0,8,0" />
+                                            <Button Content="{loc:Loc Key=panel.imageSequence.overwritePrompt.cancel}"
+                                                    Command="{Binding CancelImageSequenceOverwriteCommand}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
                             <StackPanel Visibility="{Binding IsAudioSectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Text="{loc:Loc Key=panel.audio.sectionLabel}" Style="{StaticResource LabelStyle}" Margin="0,0,0,6" />
                                 <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
@@ -1520,6 +1598,12 @@
                                                     Command="{Binding AddCurrentToRenderQueueCommand}"
                                                     CommandParameter="{x:Static media:RenderQueueItemKind.AnimatedImage}" />
                                         </Grid>
+                                        <Button Content="{loc:Loc Key=panel.group.renderQueue.addImageSequence}"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding AddCurrentToRenderQueueCommand}"
+                                                CommandParameter="{x:Static media:RenderQueueItemKind.ImageSequence}"
+                                                HorizontalAlignment="Stretch"
+                                                Margin="0,8,0,0" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -1680,6 +1764,13 @@
                                     HorizontalAlignment="Stretch"
                                     Margin="0,8,0,0"
                                     Visibility="{Binding IsAnimatedImageExportModeSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                            <Button Content="{loc:Loc Key=action.exportImageSequence}"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding ExportImageSequenceCommand}"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,8,0,0"
+                                    Visibility="{Binding IsImageSequenceExportModeSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
                     </ScrollViewer>
                 </Border>

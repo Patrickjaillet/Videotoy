@@ -56,12 +56,26 @@
   "panel.group.renderQueue.openPanel": "Ouvrir la file",
   "panel.group.renderQueue.addVideo": "Ajouter (Vidéo)",
   "panel.group.renderQueue.addAnimatedImage": "Ajouter (Image)",
+  "panel.group.renderQueue.addImageSequence": "Ajouter l'export actuel à la file (Séquence d'images)",
 
   "panel.animatedImage.sectionLabel": "IMAGE ANIMÉE",
   "panel.animatedImage.gif.colorCount": "Taille de palette (2-256 couleurs)",
   "panel.animatedImage.gif.dither": "Tramage",
   "panel.animatedImage.webp.lossless": "Sans perte",
   "panel.animatedImage.webp.quality": "Qualité (0-100)",
+
+  "panel.imageSequence.sectionLabel": "SÉQUENCE D'IMAGES",
+  "panel.imageSequence.tiffLzw": "Compression LZW",
+  "panel.imageSequence.namingMode": "Mode de nommage",
+  "panel.imageSequence.namingPattern": "Motif de nommage",
+  "panel.imageSequence.namingPattern.tooltip": "Exemple de motif printf : frame_%05d.png — Exemple de motif à jetons : shot_{index}_{time}.png",
+  "panel.imageSequence.namingPattern.hint": "Mode printf : utilisez un spécificateur de style %05d. Mode jetons : utilisez {index} et/ou {time}.",
+  "panel.imageSequence.resume": "Reprendre un export interrompu",
+  "panel.imageSequence.resume.description": "Si un export précédent a laissé des fichiers de frame sur le disque, ne pas ré-encoder les frames déjà présentes plutôt que de tout recommencer.",
+  "panel.imageSequence.overwritePrompt.message": "{0} fichier(s) de frame correspondant à ce motif de nommage existent déjà dans le dossier de sortie.",
+  "panel.imageSequence.overwritePrompt.resume": "Reprendre (ignorer les frames existantes)",
+  "panel.imageSequence.overwritePrompt.overwrite": "Écraser toutes les frames",
+  "panel.imageSequence.overwritePrompt.cancel": "Annuler",
 
   "panel.durationMode.animatedImageLocked": "L'export en image animée utilise toujours le mode Boucle parfaite.",
 
@@ -203,6 +217,7 @@
   "action.cancelExport": "Annuler l'export",
   "action.exportToMp4": "Exporter en MP4",
   "action.exportAnimatedImage": "Exporter l'image animée",
+  "action.exportImageSequence": "Exporter la séquence d'images",
   "export.animatedImage.error.manualModeUnsupported": "L'export en image animée nécessite le mode Boucle parfaite.",
 
   "toast.export.success.title": "Export terminé",
@@ -224,6 +239,7 @@
   "renderQueue.empty": "La file de rendu est vide.",
   "renderQueue.add.video": "Ajouter l'export actuel à la file (Vidéo)",
   "renderQueue.add.animatedImage": "Ajouter l'export actuel à la file (Image animée)",
+  "renderQueue.add.imageSequence": "Ajouter l'export actuel à la file (Séquence d'images)",
   "renderQueue.start": "Démarrer la file",
   "renderQueue.pause": "Mettre la file en pause",
   "renderQueue.resume": "Reprendre la file",

@@ -13,6 +13,7 @@ using Videotoy.Media;
 using Videotoy.Rendering;
 using CoreFileSizeEstimator = Videotoy.Core.ExportFileSizeEstimator;
 using CoreAnimatedImageFileSizeEstimator = Videotoy.Core.AnimatedImageFileSizeEstimator;
+using CoreImageSequenceFileSizeEstimator = Videotoy.Core.ImageSequenceFileSizeEstimator;
 using CoreLoopCalculator = Videotoy.Core.LoopCalculator;
 
 namespace Videotoy.App.ViewModels;
@@ -34,6 +35,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ExportMultiPassRenderer _exportRenderer;
     private readonly VideoExportPipeline _exportPipeline;
     private readonly AnimatedImageExportPipeline _animatedImageExportPipeline;
+    private readonly ImageSequenceExportPipeline _imageSequenceExportPipeline;
     private readonly AudioSpectrumTextureGenerator _audioSpectrumTextureGenerator;
     private readonly VideoTextureLoader _videoTextureLoader;
     private readonly BoundAssetsBuilder _boundAssetsBuilder;
@@ -364,13 +366,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public IReadOnlyList<GifDitherOption> GifDitherOptions => GifDitherOption.All;
 
+    public IReadOnlyList<ImageSequenceFormatOption> ImageSequenceFormatOptions => ImageSequenceFormatOption.All;
+
+    public IReadOnlyList<ImageSequenceNamingModeOption> ImageSequenceNamingModeOptions => ImageSequenceNamingModeOption.All;
+
     public bool IsVideoExportModeSelected => SelectedExportKind == ExportKindOption.Video;
 
     public bool IsAnimatedImageExportModeSelected => SelectedExportKind == ExportKindOption.AnimatedImage;
 
+    public bool IsImageSequenceExportModeSelected => SelectedExportKind == ExportKindOption.ImageSequence;
+
     public bool IsGifFormatSelected => SelectedAnimatedImageFormat == AnimatedImageFormatOption.Gif;
 
     public bool IsWebPFormatSelected => SelectedAnimatedImageFormat == AnimatedImageFormatOption.WebP;
+
+    /// <summary>Only TIFF exposes the optional LZW compression toggle.</summary>
+    public bool IsTiff16FormatSelected => SelectedImageSequenceFormat == ImageSequenceFormatOption.Tiff16;
+
+    public bool IsImageSequenceTokenNamingModeSelected => SelectedImageSequenceNamingMode == ImageSequenceNamingModeOption.Token;
 
     /// <summary>
     /// False when WebP lossless mode is enabled: <c>-lossless 1</c> takes no
@@ -386,12 +399,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// sees it's active and why) rather than exposing a mode that would
     /// always fail validation.
     /// </summary>
+    /// <summary>
+    /// False while Animated Image export mode is selected: animated-image
+    /// export has no "Manual duration" concept, so "Seamless loop" is forced
+    /// on and its checkbox locked. Image sequence export, unlike animated
+    /// image, supports both Manual duration and Seamless loop (each frame is
+    /// an independent file, so there is no format-level looping constraint),
+    /// so the toggle stays enabled for it.
+    /// </summary>
     public bool IsSeamlessLoopModeToggleEnabled => !IsAnimatedImageExportModeSelected;
 
     /// <summary>
-    /// Animated-image export carries no audio track: the Audio card is
-    /// hidden in that mode even when the loaded shader declares an audio
-    /// <c>iChannel</c> (<see cref="HasAudioChannel"/>).
+    /// Animated-image and image-sequence exports carry no audio track: the
+    /// Audio card is hidden in both modes even when the loaded shader
+    /// declares an audio <c>iChannel</c> (<see cref="HasAudioChannel"/>).
     /// </summary>
     public bool IsAudioSectionVisible => HasAudioChannel && IsVideoExportModeSelected;
 
@@ -538,6 +559,36 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isWebPLosslessEnabled;
+
+    /// <summary>
+    /// Top-level toggle for the image-sequence pipeline
+    /// (<see cref="ImageSequenceExportPipeline"/>) — mirrors
+    /// <see cref="SelectedAnimatedImageFormat"/>'s role for that mode.
+    /// </summary>
+    [ObservableProperty]
+    private ImageSequenceFormatOption _selectedImageSequenceFormat = ImageSequenceFormatOption.Png8;
+
+    [ObservableProperty]
+    private ImageSequenceNamingModeOption _selectedImageSequenceNamingMode = ImageSequenceNamingModeOption.Printf;
+
+    [ObservableProperty]
+    private string _imageSequenceNamingPattern = "frame_%05d.png";
+
+    /// <summary>
+    /// TIFF-only, optional LZW compression flag — see
+    /// <see cref="Videotoy.Core.Domain.ImageSequenceExportSettings.TiffUseLzwCompression"/>.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isImageSequenceTiffLzwCompressionEnabled;
+
+    /// <summary>
+    /// When true (default) and a previous sequence export left some frame
+    /// files already on disk (per <see cref="ImageSequenceExportPipeline.Preflight"/>),
+    /// the export skips re-encoding frames already present rather than
+    /// starting over from frame 0.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isImageSequenceResumeEnabled = true;
 
     [ObservableProperty]
     private ContainerFormatOption _selectedContainerFormat = ContainerFormatOption.Mp4;
@@ -802,6 +853,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ExportMultiPassRenderer exportRenderer,
         VideoExportPipeline exportPipeline,
         AnimatedImageExportPipeline animatedImageExportPipeline,
+        ImageSequenceExportPipeline imageSequenceExportPipeline,
         AudioSpectrumTextureGenerator audioSpectrumTextureGenerator,
         VideoTextureLoader videoTextureLoader,
         BoundAssetsBuilder boundAssetsBuilder,
@@ -819,6 +871,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _exportRenderer = exportRenderer;
         _exportPipeline = exportPipeline;
         _animatedImageExportPipeline = animatedImageExportPipeline;
+        _imageSequenceExportPipeline = imageSequenceExportPipeline;
         _audioSpectrumTextureGenerator = audioSpectrumTextureGenerator;
         _videoTextureLoader = videoTextureLoader;
         _boundAssetsBuilder = boundAssetsBuilder;
@@ -1107,6 +1160,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 EstimatedTotalFrames);
 
             EstimatedFileSizeText = CoreAnimatedImageFileSizeEstimator.formatEstimatedFileSize(estimatedAnimatedImageBytes);
+        }
+        else if (IsImageSequenceExportModeSelected)
+        {
+            var estimatedImageSequenceBytes = CoreImageSequenceFileSizeEstimator.estimateImageSequenceOutputBytes(
+                resolution,
+                SelectedImageSequenceFormat.Value,
+                IsImageSequenceTiffLzwCompressionEnabled,
+                EstimatedTotalFrames);
+
+            EstimatedFileSizeText = CoreImageSequenceFileSizeEstimator.formatEstimatedFileSize(estimatedImageSequenceBytes);
         }
         else
         {
@@ -2130,6 +2193,256 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
+    /// True while a collision/resume confirmation is pending for
+    /// <see cref="ExportImageSequenceCommand"/> — set by
+    /// <see cref="ExportImageSequenceAsync"/> after
+    /// <see cref="ImageSequenceExportPipeline.Preflight"/> finds existing
+    /// frame files, cleared by <see cref="ConfirmImageSequenceOverwrite"/>/
+    /// <see cref="CancelImageSequenceOverwrite"/>. The panel binds a
+    /// confirmation prompt's visibility to this flag rather than the
+    /// ViewModel blocking on a WPF <c>MessageBox</c> directly, keeping strict
+    /// MVVM (see <see cref="Toasts"/> for the same pattern applied to
+    /// notifications).
+    /// </summary>
+    [ObservableProperty]
+    private bool _isImageSequenceOverwritePromptVisible;
+
+    /// <summary>
+    /// Number of frame files already found on disk by the pending
+    /// <see cref="ImageSequenceExportPipeline.Preflight"/> check — shown in
+    /// the confirmation prompt's message.
+    /// </summary>
+    [ObservableProperty]
+    private int _imageSequenceExistingFrameCount;
+
+    private ImageSequenceExportSettings? _pendingImageSequenceExportSettings;
+
+    [RelayCommand(CanExecute = nameof(CanExportImageSequence))]
+    private async Task ExportImageSequenceAsync()
+    {
+        if (_loadedShader is null)
+        {
+            return;
+        }
+
+        var frameRate = ResolveExportFrameRate();
+        var exportSettings = new ImageSequenceExportSettings(
+            ResolveExportResolution(),
+            frameRate,
+            ResolveDurationMode(frameRate),
+            OutputDirectory,
+            ResolveImageSequenceNamingPattern(),
+            SelectedImageSequenceFormat.Value,
+            SelectedAlphaMode.Value,
+            IsImageSequenceTiffLzwCompressionEnabled);
+
+        var validationIssues = Videotoy.Core.ImageSequenceExportSettingsValidator.validate(exportSettings);
+        if (!validationIssues.IsEmpty)
+        {
+            HasExportError = true;
+            ExportErrorSummary = Videotoy.Core.ImageSequenceExportSettingsValidator.describeFirstIssue(validationIssues);
+            StatusMessage = $"Export failed: {ExportErrorSummary}";
+            ShowToast(
+                ToastSeverity.Error,
+                _localizationService.GetString("toast.export.error.title"),
+                ExportErrorSummary);
+            return;
+        }
+
+        var preflight = _imageSequenceExportPipeline.Preflight(exportSettings);
+        if (preflight.HasExistingFrames)
+        {
+            _pendingImageSequenceExportSettings = exportSettings;
+            ImageSequenceExistingFrameCount = preflight.ExistingFrameIndices.Count;
+            IsImageSequenceOverwritePromptVisible = true;
+            return;
+        }
+
+        await RunImageSequenceExportAsync(exportSettings, resumeFromExisting: false);
+    }
+
+    private bool CanConfirmImageSequenceOverwrite() => IsImageSequenceOverwritePromptVisible;
+
+    /// <summary>
+    /// User chose to resume: existing frame files matching the current
+    /// naming pattern are kept, only missing frames are (re-)encoded — see
+    /// <see cref="ImageSequenceExportPipeline.RunAsync"/>'s <c>resumeFromExisting</c>.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanConfirmImageSequenceOverwrite))]
+    private async Task ResumeImageSequenceExportAsync()
+    {
+        if (_pendingImageSequenceExportSettings is not { } settings)
+        {
+            return;
+        }
+
+        IsImageSequenceOverwritePromptVisible = false;
+        _pendingImageSequenceExportSettings = null;
+        await RunImageSequenceExportAsync(settings, resumeFromExisting: true);
+    }
+
+    /// <summary>
+    /// User chose to overwrite: every frame is re-encoded regardless of
+    /// what already exists on disk.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanConfirmImageSequenceOverwrite))]
+    private async Task ConfirmImageSequenceOverwriteAsync()
+    {
+        if (_pendingImageSequenceExportSettings is not { } settings)
+        {
+            return;
+        }
+
+        IsImageSequenceOverwritePromptVisible = false;
+        _pendingImageSequenceExportSettings = null;
+        await RunImageSequenceExportAsync(settings, resumeFromExisting: false);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanConfirmImageSequenceOverwrite))]
+    private void CancelImageSequenceOverwrite()
+    {
+        IsImageSequenceOverwritePromptVisible = false;
+        _pendingImageSequenceExportSettings = null;
+    }
+
+    private async Task RunImageSequenceExportAsync(ImageSequenceExportSettings exportSettings, bool resumeFromExisting)
+    {
+        if (_loadedShader is null)
+        {
+            return;
+        }
+
+        IsExporting = true;
+        ExportCurrentFrame = 0;
+        ExportTotalFrames = 0;
+        ExportProgressPercent = 0.0;
+        ExportRemainingTimeText = string.Empty;
+        HasExportError = false;
+        ExportErrorSummary = string.Empty;
+        StatusMessage = "Exporting...";
+
+        _exportCancellationTokenSource = new CancellationTokenSource();
+        var progress = new Progress<ImageSequenceExportProgress>(OnImageSequenceExportProgress);
+
+        var encodingStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var historyResult = ExportHistoryResult.Failed;
+        string? historyErrorSummary = null;
+
+        try
+        {
+            var (images, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
+            _exportRenderer.Initialize(
+                new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height),
+                _loadedShader.Project,
+                _loadedShader.HlslPasses,
+                images,
+                audioTracks,
+                videoSources);
+
+            await _imageSequenceExportPipeline.RunAsync(
+                exportSettings, progress, _exportCancellationTokenSource.Token,
+                resumeFromExisting && IsImageSequenceResumeEnabled);
+
+            historyResult = ExportHistoryResult.Succeeded;
+            StatusMessage = $"Export complete: {exportSettings.OutputDirectory}";
+            ShowToast(
+                ToastSeverity.Success,
+                _localizationService.GetString("toast.export.success.title"),
+                exportSettings.OutputDirectory);
+        }
+        catch (OperationCanceledException)
+        {
+            historyResult = ExportHistoryResult.Cancelled;
+            StatusMessage = "Export cancelled.";
+        }
+        catch (FfmpegEncodingException ex)
+        {
+            historyResult = ExportHistoryResult.Failed;
+            historyErrorSummary = ex.Diagnosis.Summary;
+            HasExportError = true;
+            ExportErrorSummary = ex.Diagnosis.Summary;
+            StatusMessage = $"Export failed: {ex.Diagnosis.Summary}";
+            ShowToast(
+                ToastSeverity.Error,
+                _localizationService.GetString("toast.export.error.title"),
+                ex.Diagnosis.Summary);
+        }
+        catch (Exception ex)
+        {
+            historyResult = ExportHistoryResult.Failed;
+            historyErrorSummary = ex.Message;
+            HasExportError = true;
+            ExportErrorSummary = ex.Message;
+            StatusMessage = $"Export failed: {ex.Message}";
+            ShowToast(
+                ToastSeverity.Error,
+                _localizationService.GetString("toast.export.error.title"),
+                ex.Message);
+        }
+        finally
+        {
+            encodingStopwatch.Stop();
+            AppendImageSequenceExportHistoryEntry(exportSettings, encodingStopwatch.Elapsed, historyResult, historyErrorSummary);
+
+            IsExporting = false;
+            _exportCancellationTokenSource?.Dispose();
+            _exportCancellationTokenSource = null;
+        }
+    }
+
+    private void OnImageSequenceExportProgress(ImageSequenceExportProgress progress)
+    {
+        ExportCurrentFrame = progress.FramesCompleted;
+        ExportTotalFrames = progress.TotalFrameCount;
+        ExportProgressPercent = progress.ProgressFraction * 100.0;
+        ExportRemainingTimeText = progress.EstimatedRemainingSeconds is { } remaining
+            ? FormatRemainingTime(remaining)
+            : string.Empty;
+    }
+
+    /// <summary>
+    /// Resolves the naming pattern text actually used at export time — the
+    /// printf pattern for <see cref="ImageSequenceNamingModeOption.Printf"/>,
+    /// or the token pattern for <see cref="ImageSequenceNamingModeOption.Token"/>
+    /// — both currently backed by the same <see cref="ImageSequenceNamingPattern"/>
+    /// text field, distinguished only by <see cref="SelectedImageSequenceNamingMode"/>.
+    /// </summary>
+    private ImageSequenceNamingMode ResolveImageSequenceNamingPattern() =>
+        Videotoy.Core.ImageSequenceExportSettingsValidator.tryResolveNamingPatternFromKey(
+            SelectedImageSequenceNamingMode.Key, ImageSequenceNamingPattern);
+
+    private void AppendImageSequenceExportHistoryEntry(
+        ImageSequenceExportSettings exportSettings,
+        TimeSpan encodingDuration,
+        ExportHistoryResult result,
+        string? errorSummary)
+    {
+        var formatName = SelectedImageSequenceFormat.DisplayName;
+
+        var entry = new ExportHistoryEntry
+        {
+            ShaderFilePath = _loadedShaderFilePath ?? string.Empty,
+            ShaderDisplayName = LoadedShaderName,
+            OutputFilePath = exportSettings.OutputDirectory,
+            ResolutionWidth = exportSettings.Resolution.Width,
+            ResolutionHeight = exportSettings.Resolution.Height,
+            FrameRateValue = exportSettings.FrameRate.Value,
+            DurationSeconds = Videotoy.Core.ImageSequenceExportSettingsValidator.resolveDurationSeconds(exportSettings),
+            CodecName = formatName,
+            RateControlSummary = ImageSequenceNamingPattern,
+            SpeedPresetName = string.Empty,
+            HardwareEncoderKey = "software",
+            EncodingDuration = encodingDuration,
+            Result = result,
+            ErrorSummary = errorSummary
+        };
+
+        _exportHistoryService.Append(entry);
+        ExportHistory.Insert(0, entry);
+        OnPropertyChanged(nameof(HasExportHistory));
+    }
+
+    /// <summary>
     /// Strips characters invalid in a Windows file name from the loaded
     /// shader's title, so it can be used as the default
     /// <see cref="OutputFileName"/> without the user having to edit it first.
@@ -2145,6 +2458,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool CanExportVideo() => IsShaderLoaded && !IsExporting && !IsRenderQueueRunning && IsVideoExportModeSelected;
 
     private bool CanExportAnimatedImage() => IsShaderLoaded && !IsExporting && !IsRenderQueueRunning && IsAnimatedImageExportModeSelected;
+
+    private bool CanExportImageSequence() => IsShaderLoaded && !IsExporting && !IsRenderQueueRunning && IsImageSequenceExportModeSelected;
 
     private bool CanAddCurrentToRenderQueue() => IsShaderLoaded && !string.IsNullOrEmpty(_loadedShaderFilePath);
 
@@ -2670,6 +2985,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         StopPlaybackCommand.NotifyCanExecuteChanged();
         ExportVideoCommand.NotifyCanExecuteChanged();
         ExportAnimatedImageCommand.NotifyCanExecuteChanged();
+        ExportImageSequenceCommand.NotifyCanExecuteChanged();
         GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
         AddCurrentToRenderQueueCommand.NotifyCanExecuteChanged();
     }
@@ -2678,6 +2994,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         ExportVideoCommand.NotifyCanExecuteChanged();
         ExportAnimatedImageCommand.NotifyCanExecuteChanged();
+        ExportImageSequenceCommand.NotifyCanExecuteChanged();
         CancelExportCommand.NotifyCanExecuteChanged();
         GenerateLoopSeamPreviewCommand.NotifyCanExecuteChanged();
         StartRenderQueueCommand.NotifyCanExecuteChanged();
@@ -2687,6 +3004,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         ExportVideoCommand.NotifyCanExecuteChanged();
         ExportAnimatedImageCommand.NotifyCanExecuteChanged();
+        ExportImageSequenceCommand.NotifyCanExecuteChanged();
         StartRenderQueueCommand.NotifyCanExecuteChanged();
         PauseRenderQueueCommand.NotifyCanExecuteChanged();
         CancelRenderQueueCommand.NotifyCanExecuteChanged();
@@ -2713,6 +3031,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnSelectedGifDitherChanging(GifDitherOption value) => BeginHistoryTransaction();
     partial void OnWebPQualityChanging(int value) => BeginHistoryTransaction();
     partial void OnIsWebPLosslessEnabledChanging(bool value) => BeginHistoryTransaction();
+    partial void OnSelectedImageSequenceFormatChanging(ImageSequenceFormatOption value) => BeginHistoryTransaction();
+    partial void OnSelectedImageSequenceNamingModeChanging(ImageSequenceNamingModeOption value) => BeginHistoryTransaction();
+    partial void OnImageSequenceNamingPatternChanging(string value) => BeginHistoryTransaction();
+    partial void OnIsImageSequenceTiffLzwCompressionEnabledChanging(bool value) => BeginHistoryTransaction();
+    partial void OnIsImageSequenceResumeEnabledChanging(bool value) => BeginHistoryTransaction();
     partial void OnSelectedContainerFormatChanging(ContainerFormatOption value) => BeginHistoryTransaction();
     partial void OnSelectedVideoCodecChanging(VideoCodecOption value) => BeginHistoryTransaction();
     partial void OnIsTargetBitrateModeEnabledChanging(bool value) => BeginHistoryTransaction();
@@ -2732,6 +3055,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsVideoExportModeSelected));
         OnPropertyChanged(nameof(IsAnimatedImageExportModeSelected));
+        OnPropertyChanged(nameof(IsImageSequenceExportModeSelected));
         OnPropertyChanged(nameof(IsSeamlessLoopModeToggleEnabled));
         OnPropertyChanged(nameof(IsAudioSectionVisible));
 
@@ -2740,12 +3064,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
             // L'export image animée n'a aucune notion de durée manuelle :
             // "Boucle parfaite" est verrouillée activée plutôt que
             // d'exposer un mode qui échouerait systématiquement à la
-            // validation.
+            // validation. L'export séquence d'images, lui, accepte aussi
+            // bien une durée manuelle qu'une boucle parfaite (voir
+            // Videotoy.Core.Domain.ImageSequenceExportSettings) : aucun
+            // verrouillage équivalent n'est nécessaire pour lui.
             IsSeamlessLoopModeEnabled = true;
         }
 
         ExportVideoCommand.NotifyCanExecuteChanged();
         ExportAnimatedImageCommand.NotifyCanExecuteChanged();
+        ExportImageSequenceCommand.NotifyCanExecuteChanged();
         RecalculateExportPreview();
         EndHistoryTransaction();
     }
@@ -2758,6 +3086,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RecalculateExportPreview();
         EndHistoryTransaction();
     }
+
+    partial void OnSelectedImageSequenceFormatChanged(ImageSequenceFormatOption value)
+    {
+        OnPropertyChanged(nameof(IsTiff16FormatSelected));
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
+
+    partial void OnSelectedImageSequenceNamingModeChanged(ImageSequenceNamingModeOption value)
+    {
+        OnPropertyChanged(nameof(IsImageSequenceTokenNamingModeSelected));
+        EndHistoryTransaction();
+    }
+
+    partial void OnImageSequenceNamingPatternChanged(string value) => EndHistoryTransaction();
+
+    partial void OnIsImageSequenceTiffLzwCompressionEnabledChanged(bool value)
+    {
+        RecalculateExportPreview();
+        EndHistoryTransaction();
+    }
+
+    partial void OnIsImageSequenceResumeEnabledChanged(bool value) => EndHistoryTransaction();
 
     partial void OnGifColorCountChanged(int value)
     {

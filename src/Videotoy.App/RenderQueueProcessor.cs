@@ -26,6 +26,7 @@ public sealed class RenderQueueProcessor
     private readonly ExportMultiPassRenderer _exportRenderer;
     private readonly VideoExportPipeline _exportPipeline;
     private readonly AnimatedImageExportPipeline _animatedImageExportPipeline;
+    private readonly ImageSequenceExportPipeline _imageSequenceExportPipeline;
     private readonly RenderQueueService _renderQueueService;
 
     private CancellationTokenSource? _queueCancellationTokenSource;
@@ -38,6 +39,7 @@ public sealed class RenderQueueProcessor
         ExportMultiPassRenderer exportRenderer,
         VideoExportPipeline exportPipeline,
         AnimatedImageExportPipeline animatedImageExportPipeline,
+        ImageSequenceExportPipeline imageSequenceExportPipeline,
         RenderQueueService renderQueueService)
     {
         _shaderFileService = shaderFileService;
@@ -45,6 +47,7 @@ public sealed class RenderQueueProcessor
         _exportRenderer = exportRenderer;
         _exportPipeline = exportPipeline;
         _animatedImageExportPipeline = animatedImageExportPipeline;
+        _imageSequenceExportPipeline = imageSequenceExportPipeline;
         _renderQueueService = renderQueueService;
     }
 
@@ -270,7 +273,7 @@ public sealed class RenderQueueProcessor
 
             await _exportPipeline.RunAsync(exportSettings, progress, cancellationToken, audioSourceFilePath);
         }
-        else
+        else if (item.Kind == RenderQueueItemKind.AnimatedImage)
         {
             var exportSettings = RenderQueueSettingsBuilder.BuildAnimatedImageExportSettings(item);
 
@@ -283,6 +286,26 @@ public sealed class RenderQueueProcessor
                 videoSources);
 
             await _animatedImageExportPipeline.RunAsync(exportSettings, progress, cancellationToken);
+        }
+        else
+        {
+            var exportSettings = RenderQueueSettingsBuilder.BuildImageSequenceExportSettings(item);
+
+            _exportRenderer.Initialize(
+                new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height),
+                loadedShader.Project,
+                loadedShader.HlslPasses,
+                images,
+                audioTracks,
+                videoSources);
+
+            var imageSequenceProgress = new Progress<ImageSequenceExportProgress>(p =>
+                ItemProgressChanged?.Invoke(this, new RenderQueueItemProgressEventArgs(
+                    item.Id, itemIndex, totalItems,
+                    new VideoExportProgress(p.FramesCompleted, p.TotalFrameCount, p.ElapsedSeconds))));
+
+            await _imageSequenceExportPipeline.RunAsync(
+                exportSettings, imageSequenceProgress, cancellationToken, item.ImageSequenceResumeIfInterrupted);
         }
     }
 

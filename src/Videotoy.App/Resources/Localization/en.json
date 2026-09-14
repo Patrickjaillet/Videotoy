@@ -56,12 +56,26 @@
   "panel.group.renderQueue.openPanel": "Open queue",
   "panel.group.renderQueue.addVideo": "Add (Video)",
   "panel.group.renderQueue.addAnimatedImage": "Add (Image)",
+  "panel.group.renderQueue.addImageSequence": "Add current export to queue (Image sequence)",
 
   "panel.animatedImage.sectionLabel": "ANIMATED IMAGE",
   "panel.animatedImage.gif.colorCount": "Palette size (2-256 colors)",
   "panel.animatedImage.gif.dither": "Dithering",
   "panel.animatedImage.webp.lossless": "Lossless",
   "panel.animatedImage.webp.quality": "Quality (0-100)",
+
+  "panel.imageSequence.sectionLabel": "IMAGE SEQUENCE",
+  "panel.imageSequence.tiffLzw": "LZW compression",
+  "panel.imageSequence.namingMode": "Naming mode",
+  "panel.imageSequence.namingPattern": "Naming pattern",
+  "panel.imageSequence.namingPattern.tooltip": "Printf pattern example: frame_%05d.png — Token pattern example: shot_{index}_{time}.png",
+  "panel.imageSequence.namingPattern.hint": "Printf mode: use a %05d-style specifier. Token mode: use {index} and/or {time}.",
+  "panel.imageSequence.resume": "Resume interrupted export",
+  "panel.imageSequence.resume.description": "If a previous export left frame files on disk, skip re-encoding the frames already present instead of starting over.",
+  "panel.imageSequence.overwritePrompt.message": "{0} frame file(s) matching this naming pattern already exist in the output folder.",
+  "panel.imageSequence.overwritePrompt.resume": "Resume (skip existing frames)",
+  "panel.imageSequence.overwritePrompt.overwrite": "Overwrite all frames",
+  "panel.imageSequence.overwritePrompt.cancel": "Cancel",
 
   "panel.durationMode.animatedImageLocked": "Animated image export always uses Seamless loop mode.",
 
@@ -203,6 +217,7 @@
   "action.cancelExport": "Cancel export",
   "action.exportToMp4": "Export to MP4",
   "action.exportAnimatedImage": "Export animated image",
+  "action.exportImageSequence": "Export image sequence",
   "export.animatedImage.error.manualModeUnsupported": "Animated image export requires Seamless loop mode.",
 
   "toast.export.success.title": "Export complete",
@@ -224,6 +239,7 @@
   "renderQueue.empty": "The render queue is empty.",
   "renderQueue.add.video": "Add current export to queue (Video)",
   "renderQueue.add.animatedImage": "Add current export to queue (Animated image)",
+  "renderQueue.add.imageSequence": "Add current export to queue (Image sequence)",
   "renderQueue.start": "Start queue",
   "renderQueue.pause": "Pause queue",
   "renderQueue.resume": "Resume queue",

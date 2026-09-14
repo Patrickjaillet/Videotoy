@@ -108,6 +108,127 @@ public sealed class FfmpegService
     }
 
     /// <summary>
+    /// Encode une seule frame d'une séquence d'images : lance un process
+    /// <c>ffmpeg.exe</c> dédié (<c>-frames:v 1</c>), lui écrit
+    /// <paramref name="pixelsBgra"/> sur stdin, ferme le pipe et attend la
+    /// sortie du process — contrairement aux deux surcharges <c>StartAsync</c>
+    /// (export vidéo/image animée), qui laissent un process FFmpeg
+    /// long-vivant streamer toutes les frames. Ce choix "un process par
+    /// frame" est ce qui rend la reprise d'export interrompu triviale (voir
+    /// <see cref="ImageSequenceExportPipeline"/>) : il suffit de sauter les
+    /// index de frame déjà présents sur disque, sans avoir à redémarrer un
+    /// flux stdin continu au milieu. N'utilise jamais <see cref="_process"/>/
+    /// <see cref="_stdin"/> (état partagé des deux autres surcharges) :
+    /// chaque appel est totalement indépendant et peut s'exécuter alors
+    /// qu'aucun export vidéo/image animée n'est en cours.
+    /// </summary>
+    public async Task RunSingleFrameAsync(
+        FfmpegImageSequenceOptions options,
+        string outputFilePath,
+        byte[] pixelsBgra,
+        CancellationToken cancellationToken = default)
+    {
+        var outputDirectory = Path.GetDirectoryName(outputFilePath);
+        if (!string.IsNullOrEmpty(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = _locator.ResolveExecutablePath(),
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+
+        foreach (var argument in BuildImageSequenceArguments(options, outputFilePath))
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = new Process { StartInfo = startInfo };
+        process.Start();
+
+        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+
+        try
+        {
+            await process.StandardInput.BaseStream.WriteAsync(pixelsBgra, cancellationToken).ConfigureAwait(false);
+            await process.StandardInput.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            process.StandardInput.Close();
+
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+
+            throw;
+        }
+
+        if (process.ExitCode != 0)
+        {
+            var stderrText = await stderrTask.ConfigureAwait(false);
+            var diagnosis = FfmpegStderrParser.Diagnose(stderrText.Split('\n'));
+            throw new FfmpegEncodingException(process.ExitCode, diagnosis);
+        }
+    }
+
+    /// <summary>
+    /// Construit la liste d'arguments FFmpeg pour l'encodage d'une seule
+    /// frame d'une séquence d'images : entrée <c>rawvideo</c> BGRA sur
+    /// <c>pipe:0</c> (une seule image, pas un flux), filtrée
+    /// (<c>-vf format=...</c>) vers le format de pixel cible du codec choisi
+    /// (voir <see cref="FfmpegImageSequenceOptions.FromExportSettings"/>),
+    /// puis <c>-frames:v 1</c> pour n'écrire que cette unique image. La
+    /// compression LZW du TIFF (<see cref="FfmpegImageSequenceOptions.UseTiffLzwCompression"/>)
+    /// est le seul flag conditionnel spécifique à un format.
+    /// </summary>
+    private static IEnumerable<string> BuildImageSequenceArguments(
+        FfmpegImageSequenceOptions options,
+        string outputFilePath)
+    {
+        yield return "-y";
+
+        yield return "-f";
+        yield return "rawvideo";
+        yield return "-pix_fmt";
+        yield return "bgra";
+        yield return "-video_size";
+        yield return $"{options.Width}x{options.Height}";
+        yield return "-i";
+        yield return "pipe:0";
+
+        yield return "-vf";
+        yield return $"format={options.PixelFormatName}";
+
+        yield return "-c:v";
+        yield return options.VideoCodecName;
+
+        if (options.Format == ImageSequenceFormat.Tiff16 && options.UseTiffLzwCompression)
+        {
+            yield return "-compression_algo";
+            yield return "lzw";
+        }
+
+        yield return "-frames:v";
+        yield return "1";
+
+        yield return outputFilePath;
+    }
+
+    /// <summary>
     /// Lance <c>ffmpeg.exe</c> avec <paramref name="arguments"/> et prépare
     /// le pipe stdin/la capture stderr : logique commune extraite des deux
     /// surcharges <c>StartAsync</c> (export vidéo et export image animée),

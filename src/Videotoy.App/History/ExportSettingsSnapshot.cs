@@ -29,6 +29,11 @@ public sealed record ExportSettingsSnapshot(
     GifDitherOption SelectedGifDither,
     int WebPQuality,
     bool IsWebPLosslessEnabled,
+    ImageSequenceFormatOption SelectedImageSequenceFormat,
+    ImageSequenceNamingModeOption SelectedImageSequenceNamingMode,
+    string ImageSequenceNamingPattern,
+    bool IsImageSequenceTiffLzwCompressionEnabled,
+    bool IsImageSequenceResumeEnabled,
     ContainerFormatOption SelectedContainerFormat,
     VideoCodecOption SelectedVideoCodec,
     bool IsTargetBitrateModeEnabled,
@@ -62,6 +67,11 @@ public sealed record ExportSettingsSnapshot(
         viewModel.SelectedGifDither,
         viewModel.WebPQuality,
         viewModel.IsWebPLosslessEnabled,
+        viewModel.SelectedImageSequenceFormat,
+        viewModel.SelectedImageSequenceNamingMode,
+        viewModel.ImageSequenceNamingPattern,
+        viewModel.IsImageSequenceTiffLzwCompressionEnabled,
+        viewModel.IsImageSequenceResumeEnabled,
         viewModel.SelectedContainerFormat,
         viewModel.SelectedVideoCodec,
         viewModel.IsTargetBitrateModeEnabled,
@@ -96,6 +106,11 @@ public sealed record ExportSettingsSnapshot(
         viewModel.SelectedGifDither = SelectedGifDither;
         viewModel.WebPQuality = WebPQuality;
         viewModel.IsWebPLosslessEnabled = IsWebPLosslessEnabled;
+        viewModel.SelectedImageSequenceFormat = SelectedImageSequenceFormat;
+        viewModel.SelectedImageSequenceNamingMode = SelectedImageSequenceNamingMode;
+        viewModel.ImageSequenceNamingPattern = ImageSequenceNamingPattern;
+        viewModel.IsImageSequenceTiffLzwCompressionEnabled = IsImageSequenceTiffLzwCompressionEnabled;
+        viewModel.IsImageSequenceResumeEnabled = IsImageSequenceResumeEnabled;
         viewModel.SelectedContainerFormat = SelectedContainerFormat;
         viewModel.SelectedVideoCodec = SelectedVideoCodec;
         viewModel.IsTargetBitrateModeEnabled = IsTargetBitrateModeEnabled;

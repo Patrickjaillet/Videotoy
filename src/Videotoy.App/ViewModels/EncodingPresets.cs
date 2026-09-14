@@ -143,11 +143,49 @@ public sealed record ExportKindOption(string Key, string DisplayName)
 {
     public static readonly ExportKindOption Video = new("Video", "Video (MP4/WebM/MOV)");
     public static readonly ExportKindOption AnimatedImage = new("AnimatedImage", "Animated image (GIF/WebP)");
+    public static readonly ExportKindOption ImageSequence = new("ImageSequence", "Image sequence (PNG/TIFF/EXR)");
 
-    public static readonly IReadOnlyList<ExportKindOption> All = [Video, AnimatedImage];
+    public static readonly IReadOnlyList<ExportKindOption> All = [Video, AnimatedImage, ImageSequence];
 
     public static ExportKindOption FromKey(string key) =>
         All.FirstOrDefault(option => option.Key == key) ?? Video;
+}
+
+/// <summary>
+/// Preset entry for the image-sequence format dropdown. <see cref="Png16"/>/
+/// <see cref="Tiff16"/>/<see cref="Exr16"/> are produced by bit-depth-expanding
+/// the render pipeline's existing 8-bit RGBA source (see
+/// <see cref="Videotoy.Core.Domain.ImageSequenceFormat"/>'s doc comment) —
+/// not genuine wider dynamic range, which arrives with the v2.3.0 float
+/// render pipeline.
+/// </summary>
+public sealed record ImageSequenceFormatOption(string Key, string DisplayName, ImageSequenceFormat Value)
+{
+    public static readonly ImageSequenceFormatOption Png8 = new("Png8", "PNG (8-bit)", ImageSequenceFormat.Png8);
+    public static readonly ImageSequenceFormatOption Png16 = new("Png16", "PNG (16-bit)", ImageSequenceFormat.Png16);
+    public static readonly ImageSequenceFormatOption Tiff16 = new("Tiff16", "TIFF (16-bit)", ImageSequenceFormat.Tiff16);
+    public static readonly ImageSequenceFormatOption Exr16 = new("Exr16", "EXR (16-bit half-float)", ImageSequenceFormat.Exr16);
+
+    public static readonly IReadOnlyList<ImageSequenceFormatOption> All = [Png8, Png16, Tiff16, Exr16];
+
+    public static ImageSequenceFormatOption FromKey(string key) =>
+        All.FirstOrDefault(option => option.Key == key) ?? Png8;
+}
+
+/// <summary>
+/// Preset entry for the image-sequence naming-pattern mode toggle
+/// (printf-style vs. token-style — see
+/// <see cref="Videotoy.Core.Domain.ImageSequenceNamingMode"/>).
+/// </summary>
+public sealed record ImageSequenceNamingModeOption(string Key, string DisplayName)
+{
+    public static readonly ImageSequenceNamingModeOption Printf = new("Printf", "Printf pattern (frame_%05d.png)");
+    public static readonly ImageSequenceNamingModeOption Token = new("Token", "Token pattern ({index}/{time})");
+
+    public static readonly IReadOnlyList<ImageSequenceNamingModeOption> All = [Printf, Token];
+
+    public static ImageSequenceNamingModeOption FromKey(string key) =>
+        All.FirstOrDefault(option => option.Key == key) ?? Printf;
 }
 
 public sealed record AnimatedImageFormatOption(string Key, string DisplayName, AnimatedImageFormat Value)

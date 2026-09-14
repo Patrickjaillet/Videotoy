@@ -12,9 +12,11 @@
     <Compile Include="LoopCalculator.fs" />
     <Compile Include="ExportSettingsValidator.fs" />
     <Compile Include="AnimatedImageExportSettingsValidator.fs" />
+    <Compile Include="ImageSequenceExportSettingsValidator.fs" />
     <Compile Include="ExportProgressEstimator.fs" />
     <Compile Include="ExportFileSizeEstimator.fs" />
     <Compile Include="AnimatedImageFileSizeEstimator.fs" />
+    <Compile Include="ImageSequenceFileSizeEstimator.fs" />
     <Compile Include="UniformBuilder.fs" />
     <Compile Include="ShaderModel.fs" />
     <Compile Include="ShaderLanguageDetector.fs" />

@@ -5,7 +5,8 @@ namespace Videotoy.Media;
 public enum RenderQueueItemKind
 {
     Video,
-    AnimatedImage
+    AnimatedImage,
+    ImageSequence
 }
 
 public enum RenderQueueItemStatus
@@ -108,6 +109,17 @@ public sealed class RenderQueueItem
     public int WebPQuality { get; init; } = 90;
 
     public bool IsWebPLosslessEnabled { get; init; }
+
+    // ImageSequence-only settings — meaningless when Kind = Video/AnimatedImage.
+    public string ImageSequenceFormatKey { get; init; } = "Png8";
+
+    public string ImageSequenceNamingPatternKey { get; init; } = "Printf";
+
+    public string ImageSequenceNamingPattern { get; init; } = "frame_%05d.png";
+
+    public bool ImageSequenceTiffUseLzwCompression { get; init; }
+
+    public bool ImageSequenceResumeIfInterrupted { get; init; } = true;
 
     // Mutable queue-management state, persisted so order/status survive a
     // restart. Per-item live progress (current frame/percent) is

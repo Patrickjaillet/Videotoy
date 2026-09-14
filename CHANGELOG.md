@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-14
+
+### Added
+
+- New "Image Sequence" export mode, alongside Video and Animated Image:
+  each rendered frame is written as an individual image file rather than
+  muxed into a video container, for direct import into an external
+  compositing/editing pipeline. New `ImageSequenceExportPipeline`
+  (`Videotoy.Ffmpeg`) launches one dedicated FFmpeg encode invocation per
+  frame (`-frames:v 1`, not a single continuous stdin stream like the video/
+  animated-image pipelines) — the deliberate reason being that this makes
+  resuming an interrupted export trivial: already-encoded frame files are
+  simply skipped
+- Four sequence formats, all alpha-carrying: PNG 8-bit (`-pix_fmt rgba`),
+  PNG 16-bit (`-pix_fmt rgba64be`), TIFF 16-bit with optional LZW
+  compression (`-pix_fmt rgba64le`, `-compression_algo lzw`), and EXR 16-bit
+  half-float (`-pix_fmt gbrapf16le`, not re-verified against a live
+  `ffmpeg.exe` in this environment — see the code comment on
+  `FfmpegImageSequenceOptions`). **Scoping note**: the render pipeline is
+  currently 8-bit RGBA only (no HDR float render target — planned for
+  v2.3.0), so the 16-bit PNG/TIFF and EXR formats are produced by
+  bit-depth-expanding the existing 8-bit source, not genuine wider dynamic
+  range; `Domain.ImageSequenceFormat`'s doc comment states this plainly, and
+  the written metadata JSON's colorspace note is honest about it too
+  (`"Linear half-float (expanded from 8-bit sRGB source — not true HDR; see
+  v2.3.0)"` for EXR)
+- Configurable frame naming: a printf-style pattern (`frame_%05d.png`) or a
+  token pattern (`{index}`/`{time}`, e.g. `shot_{index}_{time}.png`) via
+  `Domain.ImageSequenceNamingMode`, validated to always contain a
+  frame-distinguishing specifier/token (`ImageSequenceExportSettingsValidator`
+  rejects a pattern that would make every frame overwrite the same file).
+  Collision detection scans the output directory before starting; if
+  matching frame files already exist, the render settings panel shows an
+  inline confirmation prompt offering to resume or to overwrite
+- Resume of an interrupted sequence export: when frame files already exist
+  and the user chooses "Resume", already-encoded frame indices are skipped
+  rather than re-rendered — the frame is still rendered (the deterministic
+  renderer has no arbitrary-index resume API), only the FFmpeg
+  encode/disk-write step is skipped, which stays far cheaper than the
+  per-frame FFmpeg invocation it avoids
+- A `<sequence-name>.metadata.json` file written in the output directory at
+  the end of a successful export: resolution, FPS, first/last frame index
+  actually written, colorspace note, alpha mode, and format — for import
+  into external compositing/editing tools
+- Integration with the render queue: `RenderQueueItemKind.ImageSequence`
+  alongside the existing `Video`/`AnimatedImage` kinds, with its own
+  persisted settings group in `RenderQueueItem`
+- New Core modules: `ImageSequenceExportSettingsValidator` (validation,
+  naming-pattern resolution/substitution, format/naming-mode key
+  round-tripping) and `ImageSequenceFileSizeEstimator` (coarse per-format
+  bytes-per-pixel estimate — PNG/TIFF/EXR have no bitrate/CRF concept, so
+  this is intentionally coarser than the video estimator)
+
 ## [2.1.0] - 2026-09-02
 
 ### Added
