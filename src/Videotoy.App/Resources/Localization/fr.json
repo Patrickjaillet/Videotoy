@@ -47,11 +47,17 @@
 
   "panel.exportKind.sectionLabel": "TYPE D'EXPORT",
 
+  "panel.group.viewportBackground.sectionLabel": "FOND DE PRÉVISUALISATION",
   "panel.group.resolutionFps.sectionLabel": "RÉSOLUTION / FRÉQUENCE",
   "panel.group.durationLoop.sectionLabel": "DURÉE / BOUCLE",
   "panel.group.codecContainer.sectionLabel": "CODEC / CONTENEUR",
   "panel.group.inputs.sectionLabel": "ENTRÉES",
   "panel.group.renderQueue.sectionLabel": "FILE DE RENDU",
+
+  "panel.viewportBackground.description": "Simple aide visuelle pour la prévisualisation en direct — n'affecte jamais le fichier exporté, qui utilise toujours le canal alpha rendu par le shader tel quel.",
+  "panel.viewportBackground.color.label": "Couleur de fond (#AARRGGBB)",
+  "panel.viewportBackground.image.label": "Image de référence",
+  "panel.viewportBackground.image.browse": "Parcourir…",
   "panel.group.renderQueue.itemCount": "{0} élément(s) en file",
   "panel.group.renderQueue.openPanel": "Ouvrir la file",
   "panel.group.renderQueue.addVideo": "Ajouter (Vidéo)",

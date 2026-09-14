@@ -1,6 +1,24 @@
 using Videotoy.Core.Domain;
+using Videotoy.Media;
 
 namespace Videotoy.App.ViewModels;
+
+/// <summary>
+/// Preset entry for the preview viewport background mode (Phase v2.1.0's
+/// deferred item). Purely a live-preview visualization aid — never affects
+/// export output, which always uses the shader's rendered alpha as-is.
+/// </summary>
+public sealed record ViewportBackgroundModeOption(string Key, string DisplayName, ViewportBackgroundMode Value)
+{
+    public static readonly ViewportBackgroundModeOption Checkerboard = new("Checkerboard", "Transparent checkerboard", ViewportBackgroundMode.Checkerboard);
+    public static readonly ViewportBackgroundModeOption SolidColor = new("SolidColor", "Solid color", ViewportBackgroundMode.SolidColor);
+    public static readonly ViewportBackgroundModeOption ReferenceImage = new("ReferenceImage", "Reference image", ViewportBackgroundMode.ReferenceImage);
+
+    public static readonly IReadOnlyList<ViewportBackgroundModeOption> All = [Checkerboard, SolidColor, ReferenceImage];
+
+    public static ViewportBackgroundModeOption FromKey(string key) =>
+        All.FirstOrDefault(option => option.Key == key) ?? Checkerboard;
+}
 
 public sealed record ContainerFormatOption(string Key, string DisplayName, ContainerFormat Value)
 {

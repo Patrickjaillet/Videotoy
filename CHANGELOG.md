@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-09-14
+
+### Added
+
+- Configurable preview viewport background, completing the item deferred
+  from Phase v2.1.0's alpha-channel export work: a "Preview background"
+  panel section offers a transparent checkerboard (default), a solid color,
+  or a reference image, so a shader exporting with a straight alpha channel
+  can be visually checked against something other than the fixed opaque
+  viewport background. New `Videotoy.Media.ViewportBackgroundSettingsService`
+  persists the choice globally (`%AppData%\Videotoy\viewport-background.json`),
+  mirroring `OnboardingStateService`'s storage pattern. Purely a live-preview
+  visualization aid — the exported file always uses the shader's rendered
+  alpha as-is, unaffected by this setting
+- Implemented entirely in XAML: three background layers (a tiled
+  `DrawingBrush` checkerboard, a bindable `SolidColorBrush`, or an `Image`
+  bound to the chosen reference image) stacked behind the existing preview
+  `Image`, which is already `Bgra32` with real per-pixel alpha — WPF's
+  normal compositing handles the blend, so no change was needed to the
+  D3D11 render pipeline or `MultiPassRenderer`
+
 ## [2.2.0] - 2026-09-14
 
 ### Added

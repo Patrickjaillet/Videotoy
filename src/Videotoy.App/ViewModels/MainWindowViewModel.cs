@@ -29,6 +29,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ExportHistoryService _exportHistoryService;
     private readonly LoopSettingsService _loopSettingsService;
     private readonly OnboardingStateService _onboardingStateService;
+    private readonly ViewportBackgroundSettingsService _viewportBackgroundSettingsService;
     private readonly LocalizationService _localizationService;
     private readonly MultiPassRenderer _previewRenderer;
     private readonly PreviewClock _previewClock = new();
@@ -89,6 +90,121 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _statusMessage = "Idle";
+
+    /// <summary>
+    /// Preview viewport background (Phase v2.1.0's deferred item): a pure
+    /// live-preview visualization aid to check a straight-alpha shader
+    /// (Phase v2.1.0) against a transparent checkerboard, a solid color, or
+    /// a reference image. Never affects export output — the export pipeline
+    /// always renders the shader's declared alpha as-is, independent of
+    /// whatever is selected here.
+    /// </summary>
+    public IReadOnlyList<ViewportBackgroundModeOption> ViewportBackgroundModeOptions { get; } = ViewportBackgroundModeOption.All;
+
+    [ObservableProperty]
+    private ViewportBackgroundModeOption _selectedViewportBackgroundMode = ViewportBackgroundModeOption.Checkerboard;
+
+    [ObservableProperty]
+    private Color _viewportBackgroundColor = Color.FromRgb(0x2A, 0x2D, 0x31);
+
+    [ObservableProperty]
+    private string _viewportBackgroundImagePath = "";
+
+    [ObservableProperty]
+    private ImageSource? _viewportBackgroundImageSource;
+
+    public bool IsViewportBackgroundCheckerboardMode => SelectedViewportBackgroundMode == ViewportBackgroundModeOption.Checkerboard;
+
+    public bool IsViewportBackgroundSolidColorMode => SelectedViewportBackgroundMode == ViewportBackgroundModeOption.SolidColor;
+
+    public bool IsViewportBackgroundReferenceImageMode => SelectedViewportBackgroundMode == ViewportBackgroundModeOption.ReferenceImage;
+
+    partial void OnSelectedViewportBackgroundModeChanged(ViewportBackgroundModeOption value)
+    {
+        OnPropertyChanged(nameof(IsViewportBackgroundCheckerboardMode));
+        OnPropertyChanged(nameof(IsViewportBackgroundSolidColorMode));
+        OnPropertyChanged(nameof(IsViewportBackgroundReferenceImageMode));
+        SaveViewportBackgroundSettings();
+    }
+
+    partial void OnViewportBackgroundColorChanged(Color value) => SaveViewportBackgroundSettings();
+
+    partial void OnViewportBackgroundImagePathChanged(string value)
+    {
+        ViewportBackgroundImageSource = LoadViewportBackgroundImageSource(value);
+        SaveViewportBackgroundSettings();
+    }
+
+    private static ImageSource? LoadViewportBackgroundImageSource(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+        catch (FileFormatException)
+        {
+            return null;
+        }
+    }
+
+    private void LoadViewportBackgroundSettings()
+    {
+        var state = _viewportBackgroundSettingsService.Load();
+        SelectedViewportBackgroundMode = ViewportBackgroundModeOption.FromKey(state.Mode.ToString());
+        ViewportBackgroundColor = TryParseColor(state.SolidColorHex) ?? ViewportBackgroundColor;
+        ViewportBackgroundImagePath = state.ReferenceImagePath;
+    }
+
+    private void SaveViewportBackgroundSettings()
+    {
+        _viewportBackgroundSettingsService.Save(new ViewportBackgroundState
+        {
+            Mode = SelectedViewportBackgroundMode.Value,
+            SolidColorHex = ViewportBackgroundColor.ToString(),
+            ReferenceImagePath = ViewportBackgroundImagePath
+        });
+    }
+
+    private static Color? TryParseColor(string hex)
+    {
+        try
+        {
+            return (Color)ColorConverter.ConvertFromString(hex);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
+
+    [RelayCommand]
+    private void BrowseViewportBackgroundImage()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.tiff|All files|*.*"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            ViewportBackgroundImagePath = dialog.FileName;
+        }
+    }
 
     public IReadOnlyList<ShaderLanguageOption> ShaderLanguageOptions { get; } = ShaderLanguageOption.All;
 
@@ -750,6 +866,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isRenderQueueGroupExpanded = true;
 
+    [ObservableProperty]
+    private bool _isViewportBackgroundGroupExpanded = true;
+
     /// <summary>
     /// Currently visible toast notifications (export success/failure, etc.),
     /// newest last. Each entry is removed automatically after
@@ -848,6 +967,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ExportHistoryService exportHistoryService,
         LoopSettingsService loopSettingsService,
         OnboardingStateService onboardingStateService,
+        ViewportBackgroundSettingsService viewportBackgroundSettingsService,
         LocalizationService localizationService,
         PreviewMultiPassRenderer previewRenderer,
         ExportMultiPassRenderer exportRenderer,
@@ -866,6 +986,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _exportHistoryService = exportHistoryService;
         _loopSettingsService = loopSettingsService;
         _onboardingStateService = onboardingStateService;
+        _viewportBackgroundSettingsService = viewportBackgroundSettingsService;
         _localizationService = localizationService;
         _previewRenderer = previewRenderer;
         _exportRenderer = exportRenderer;
@@ -891,6 +1012,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ReloadExportHistory();
         ReloadRenderQueue();
         RecalculateExportPreview();
+        LoadViewportBackgroundSettings();
     }
 
     /// <summary>

@@ -47,11 +47,17 @@
 
   "panel.exportKind.sectionLabel": "EXPORT TYPE",
 
+  "panel.group.viewportBackground.sectionLabel": "PREVIEW BACKGROUND",
   "panel.group.resolutionFps.sectionLabel": "RESOLUTION / FRAME RATE",
   "panel.group.durationLoop.sectionLabel": "DURATION / LOOP",
   "panel.group.codecContainer.sectionLabel": "CODEC / CONTAINER",
   "panel.group.inputs.sectionLabel": "INPUTS",
   "panel.group.renderQueue.sectionLabel": "RENDER QUEUE",
+
+  "panel.viewportBackground.description": "Purely a live-preview aid to check a shader's transparency — never affects the exported file, which always uses the shader's rendered alpha as-is.",
+  "panel.viewportBackground.color.label": "Background color (#AARRGGBB)",
+  "panel.viewportBackground.image.label": "Reference image",
+  "panel.viewportBackground.image.browse": "Browse…",
   "panel.group.renderQueue.itemCount": "{0} item(s) queued",
   "panel.group.renderQueue.openPanel": "Open queue",
   "panel.group.renderQueue.addVideo": "Add (Video)",

@@ -114,6 +114,7 @@ public partial class App : Application
         services.AddSingleton<RenderQueueService>();
         services.AddSingleton<LoopSettingsService>();
         services.AddSingleton<OnboardingStateService>();
+        services.AddSingleton<ViewportBackgroundSettingsService>();
         services.AddSingleton<LocalizationService>();
 
         services.AddSingleton<BoundAssetsBuilder>();

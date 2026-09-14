@@ -677,6 +677,28 @@
                                                Margin="0,10,0,0" />
                                 </StackPanel>
 
+                                <!--
+                                    Preview background layers (Phase v2.1.0's deferred item),
+                                    stacked behind the rendered Image below — WPF alpha-blends
+                                    the Image's Bgra32 pixels over whichever of these is visible,
+                                    so a straight-alpha shader's transparency can be checked
+                                    visually. Purely a live-preview aid, never affects export.
+                                -->
+                                <Rectangle Width="800" Height="450"
+                                           Fill="{StaticResource ViewportCheckerboardBrush}"
+                                           Visibility="{Binding IsViewportBackgroundCheckerboardMode, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <Rectangle Width="800" Height="450"
+                                           Visibility="{Binding IsViewportBackgroundSolidColorMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Rectangle.Fill>
+                                        <SolidColorBrush Color="{Binding ViewportBackgroundColor}" />
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                                <Image Source="{Binding ViewportBackgroundImageSource}"
+                                       Width="800"
+                                       Height="450"
+                                       Stretch="UniformToFill"
+                                       Visibility="{Binding IsViewportBackgroundReferenceImageMode, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
                                 <Image Source="{Binding PreviewImageSource}"
                                        Width="800"
                                        Height="450"
@@ -911,6 +933,52 @@
                                                Margin="0,8,0,0" />
                                 </StackPanel>
                             </Border>
+
+                            <ToggleButton Style="{StaticResource CollapsibleGroupHeaderStyle}"
+                                          Content="{loc:Loc Key=panel.group.viewportBackground.sectionLabel}"
+                                          IsChecked="{Binding IsViewportBackgroundGroupExpanded}"
+                                          Margin="0,0,0,6" />
+                            <StackPanel Visibility="{Binding IsViewportBackgroundGroupExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,18">
+                                <StackPanel>
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding ViewportBackgroundModeOptions}"
+                                              SelectedItem="{Binding SelectedViewportBackgroundMode}"
+                                              DisplayMemberPath="DisplayName" />
+                                    <TextBlock Text="{loc:Loc Key=panel.viewportBackground.description}"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource LabelStyle}"
+                                               Margin="0,6,0,0" />
+
+                                    <StackPanel Margin="0,10,0,0"
+                                                Visibility="{Binding IsViewportBackgroundSolidColorMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Loc Key=panel.viewportBackground.color.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding ViewportBackgroundColor, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Margin="0,10,0,0"
+                                                Visibility="{Binding IsViewportBackgroundReferenceImageMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Loc Key=panel.viewportBackground.image.label}" Style="{StaticResource LabelStyle}" Margin="0,0,0,4" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="10" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0"
+                                                     Style="{StaticResource FieldTextBoxStyle}"
+                                                     Text="{Binding ViewportBackgroundImagePath}"
+                                                     IsReadOnly="True" />
+                                            <Button Grid.Column="2"
+                                                    Content="{loc:Loc Key=panel.viewportBackground.image.browse}"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Command="{Binding BrowseViewportBackgroundImageCommand}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            </StackPanel>
 
                             <ToggleButton Style="{StaticResource CollapsibleGroupHeaderStyle}"
                                           Content="{loc:Loc Key=panel.group.resolutionFps.sectionLabel}"

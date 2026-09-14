@@ -11,6 +11,36 @@
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF6B7075" />
     <SolidColorBrush x:Key="BorderBrush" Color="#FFE0E2E6" />
     <SolidColorBrush x:Key="ViewportBackgroundBrush" Color="#FF0C0C0E" />
+
+    <!--
+        Transparent checkerboard tile for the preview viewport background
+        (Phase v2.1.0's deferred item) — standard 8px alternating-square
+        pattern used to visually check a straight-alpha shader's transparency
+        in the live preview. Purely a visualization aid, never affects export
+        output.
+    -->
+    <DrawingBrush x:Key="ViewportCheckerboardBrush"
+                  Viewport="0,0,16,16"
+                  ViewportUnits="Absolute"
+                  TileMode="Tile">
+        <DrawingBrush.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#FF3A3D42">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,16,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#FF2A2D31">
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <RectangleGeometry Rect="0,0,8,8" />
+                            <RectangleGeometry Rect="8,8,8,8" />
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingBrush.Drawing>
+    </DrawingBrush>
     <SolidColorBrush x:Key="DangerBrush" Color="#FFD8483C" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#FF2FA765" />
 
