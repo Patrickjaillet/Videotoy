@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.2] - 2026-09-24
+
+### Fixed
+
+- FFmpeg `Process` leak when `Process.Start()` throws, which left the export
+  service permanently stuck (`IsRunning` throwing on a never-started
+  process) until the app was restarted
+- Video texture cache key ignoring target resolution, letting a
+  preview-resolution decoded frame be reused during an export at a
+  different resolution — a real GPU memory corruption risk via the
+  unchecked `Buffer.MemoryCopy` in `MultiPassRenderer.RefreshDynamicAssets`
+- "Disk full" `IOException` incorrectly reclassified as a transient error,
+  causing a doomed export to be retried up to `MaxTransientRetries` times
+  instead of failing immediately
+- FFmpeg SHA-256 integrity check only performed once at startup (TOCTOU);
+  now re-verified before every `ffmpeg.exe` launch
+- `iMouse`, `iDate`, and `iChannelResolution` uniforms always reading zero
+- Render queue's export loop running on the UI thread, freezing the
+  interface during batch exports
+- No global unhandled-exception handlers, and `App.OnStartup` only
+  protecting the FFmpeg integrity check
+- `ShadertoyJsonParser` crashing on valid but unexpectedly-shaped JSON
+  instead of failing gracefully
+- Path traversal in `iChannel` asset resolution
+- No handling of GPU device loss (DXGI device removed/reset)
+- Output filename not guarded against CLI flag confusion (e.g. a file
+  starting with `-`)
+- Hardware encoder probe failures silently swallowed
+- Transient COM pixel shader leak on shader compilation failure
+- Unprotected `async void` handler for video drag-and-drop
+- `MainWindowViewModel` never unsubscribing from its event handlers,
+  a lingering memory leak
+- Orphaned localization string and a few remaining untranslated French
+  strings
+- Removed the dead, unused single-pass rendering duplication
+  (`IShaderRenderer`/`NullShaderRenderer`/old `D3D11ShaderRenderer` path)
+
+### Added
+
+- New `Videotoy.Tests` xUnit project (wired into CI) with regression tests
+  covering the FFmpeg transient-error classifier, the resolution-aware
+  video frame cache key, and Shadertoy JSON parser robustness
+
 ## [2.2.1] - 2026-09-14
 
 ### Added
