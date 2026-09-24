@@ -24,6 +24,7 @@ public sealed class FfmpegService
 {
     private readonly FfmpegLocator _locator;
     private readonly HardwareEncoderProbe _hardwareEncoderProbe;
+    private readonly FfmpegIntegrityVerifier _integrityVerifier;
 
     private Process? _process;
     private Stream? _stdin;
@@ -31,10 +32,14 @@ public sealed class FfmpegService
     private readonly List<string> _stderrTail = new();
     private readonly object _stderrLock = new();
 
-    public FfmpegService(FfmpegLocator locator, HardwareEncoderProbe hardwareEncoderProbe)
+    public FfmpegService(
+        FfmpegLocator locator,
+        HardwareEncoderProbe hardwareEncoderProbe,
+        FfmpegIntegrityVerifier integrityVerifier)
     {
         _locator = locator;
         _hardwareEncoderProbe = hardwareEncoderProbe;
+        _integrityVerifier = integrityVerifier;
     }
 
     public bool IsRunning => _process is { HasExited: false };
@@ -225,8 +230,18 @@ public sealed class FfmpegService
         yield return "-frames:v";
         yield return "1";
 
-        yield return outputFilePath;
+        yield return SanitizeOutputPath(outputFilePath);
     }
+
+    /// <summary>
+    /// FFmpeg interprète le dernier argument positionnel comme un chemin de
+    /// sortie, mais l'analyse de sa ligne de commande reste positionnelle :
+    /// une valeur commençant par <c>-</c> (nom de fichier choisi par
+    /// l'utilisateur, projet copié tel quel...) serait prise pour une option
+    /// plutôt qu'un chemin. Normaliser en chemin absolu élimine ce risque
+    /// (un chemin absolu ne commence jamais par <c>-</c>).
+    /// </summary>
+    private static string SanitizeOutputPath(string path) => Path.GetFullPath(path);
 
     /// <summary>
     /// Lance <c>ffmpeg.exe</c> avec <paramref name="arguments"/> et prépare
@@ -236,6 +251,8 @@ public sealed class FfmpegService
     /// </summary>
     private Task LaunchProcessAsync(IEnumerable<string> arguments)
     {
+        _integrityVerifier.EnsureStillValid();
+
         var startInfo = new ProcessStartInfo
         {
             FileName = _locator.ResolveExecutablePath(),
@@ -250,9 +267,18 @@ public sealed class FfmpegService
             startInfo.ArgumentList.Add(argument);
         }
 
-        _process = new Process { StartInfo = startInfo };
-        _process.Start();
+        var process = new Process { StartInfo = startInfo };
+        try
+        {
+            process.Start();
+        }
+        catch
+        {
+            process.Dispose();
+            throw;
+        }
 
+        _process = process;
         _stdin = _process.StandardInput.BaseStream;
 
         lock (_stderrLock)
@@ -503,7 +529,7 @@ public sealed class FfmpegService
                 yield return options.MuxerName;
             }
 
-            yield return options.OutputFilePath;
+            yield return SanitizeOutputPath(options.OutputFilePath);
         }
     }
 
@@ -542,7 +568,7 @@ public sealed class FfmpegService
             case AnimatedImagePass.GifPaletteGen:
                 yield return "-vf";
                 yield return $"palettegen=max_colors={options.GifColorCount.ToString(CultureInfo.InvariantCulture)}:stats_mode=diff";
-                yield return options.PaletteFilePath;
+                yield return SanitizeOutputPath(options.PaletteFilePath);
                 break;
 
             case AnimatedImagePass.GifPaletteUse:
@@ -552,7 +578,7 @@ public sealed class FfmpegService
                 yield return $"paletteuse=dither={options.GifDitherName}";
                 yield return "-loop";
                 yield return "0";
-                yield return options.OutputFilePath;
+                yield return SanitizeOutputPath(options.OutputFilePath);
                 break;
 
             case AnimatedImagePass.WebP:
@@ -569,7 +595,7 @@ public sealed class FfmpegService
 
                 yield return "-loop";
                 yield return "0";
-                yield return options.OutputFilePath;
+                yield return SanitizeOutputPath(options.OutputFilePath);
                 break;
         }
     }
@@ -614,7 +640,20 @@ public sealed class FfmpegService
             throw new InvalidOperationException("FFmpeg process is not running; call Start first.");
         }
 
-        await _stdin.WriteAsync(pixelsBgra, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _stdin.WriteAsync(pixelsBgra, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException) when (_process is { HasExited: true })
+        {
+            // Le pipe stdin s'est rompu parce que FFmpeg a déjà terminé (le
+            // plus souvent en échec, ex. disque plein) : c'est cette cause
+            // réelle qui doit être classifiée par TransientFfmpegErrorClassifier,
+            // pas l'IOException de bas niveau du pipe, qui masquerait un échec
+            // définitif (disque plein) derrière une erreur systématiquement
+            // retentée.
+            await ThrowDiagnosedFailureAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public async Task<int> FinishAsync(CancellationToken cancellationToken = default)
@@ -626,8 +665,17 @@ public sealed class FfmpegService
 
         if (_stdin is not null)
         {
-            await _stdin.FlushAsync(cancellationToken).ConfigureAwait(false);
-            _stdin.Close();
+            try
+            {
+                await _stdin.FlushAsync(cancellationToken).ConfigureAwait(false);
+                _stdin.Close();
+            }
+            catch (IOException)
+            {
+                // Pipe déjà rompu (FFmpeg a terminé de son côté) : sans objet,
+                // le diagnostic ci-dessous se chargera de qualifier l'échec.
+            }
+
             _stdin = null;
         }
 
@@ -642,16 +690,40 @@ public sealed class FfmpegService
 
         if (exitCode != 0)
         {
-            var diagnosis = FfmpegStderrParser.Diagnose(GetStderrTail());
-            _process.Dispose();
-            _process = null;
-            throw new FfmpegEncodingException(exitCode, diagnosis);
+            await ThrowDiagnosedFailureAsync(cancellationToken).ConfigureAwait(false);
         }
 
         _process.Dispose();
         _process = null;
 
         return exitCode;
+    }
+
+    /// <summary>
+    /// Attend la fin du process (déjà survenue ou imminente), puis lève une
+    /// <see cref="FfmpegEncodingException"/> portant le diagnostic réel tiré
+    /// de stderr (voir <see cref="FfmpegStderrParser"/>) plutôt qu'une
+    /// exception de bas niveau (pipe rompu) sans information sur la cause.
+    /// </summary>
+    private async Task ThrowDiagnosedFailureAsync(CancellationToken cancellationToken)
+    {
+        var process = _process!;
+
+        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+        if (_stderrPumpTask is not null)
+        {
+            await _stderrPumpTask.ConfigureAwait(false);
+        }
+
+        var exitCode = process.ExitCode;
+        var diagnosis = FfmpegStderrParser.Diagnose(GetStderrTail());
+
+        process.Dispose();
+        _process = null;
+        _stdin = null;
+
+        throw new FfmpegEncodingException(exitCode, diagnosis);
     }
 
     /// <summary>

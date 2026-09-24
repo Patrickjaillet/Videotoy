@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Videotoy.Transpiler", "src\Videotoy.Transpiler\Videotoy.Transpiler.csproj", "{C7A53D03-FB97-4A7A-9244-94D277410845}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Videotoy.Tests", "tests\Videotoy.Tests\Videotoy.Tests.csproj", "{A1B2C3D4-0006-4E5F-8A9B-000000000006}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -99,6 +101,18 @@ Global
 		{C7A53D03-FB97-4A7A-9244-94D277410845}.Release|Any CPU.Build.0 = Release|Any CPU
 		{C7A53D03-FB97-4A7A-9244-94D277410845}.Release|x86.ActiveCfg = Release|Any CPU
 		{C7A53D03-FB97-4A7A-9244-94D277410845}.Release|x86.Build.0 = Release|Any CPU
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Debug|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Debug|x64.Build.0 = Debug|x64
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Debug|x86.Build.0 = Debug|Any CPU
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Release|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Release|x64.Build.0 = Release|x64
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-0006-4E5F-8A9B-000000000006}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

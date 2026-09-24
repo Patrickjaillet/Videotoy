@@ -49,7 +49,7 @@ public sealed class VideoTextureLoader
     {
         var probe = await ProbeAsync(filePath, cancellationToken).ConfigureAwait(false);
         var frameIndex = (int)Math.Round(timestampSeconds * probe.FrameRate);
-        var key = new VideoFrameKey(filePath, frameIndex);
+        var key = new VideoFrameKey(filePath, frameIndex, targetWidth, targetHeight);
 
         return await _cache.GetOrDecodeAsync(key, () =>
             _decoder.DecodeFrameBgraAsync(filePath, timestampSeconds, targetWidth, targetHeight, cancellationToken)

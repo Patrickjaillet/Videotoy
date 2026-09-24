@@ -52,7 +52,7 @@ public class MultiPassRenderer : IDisposable
         Video
     }
 
-    private sealed record BoundAsset(ID3D11Texture2D Texture, ID3D11ShaderResourceView View, AssetKind Kind);
+    private sealed record BoundAsset(ID3D11Texture2D Texture, ID3D11ShaderResourceView View, AssetKind Kind, int Width, int Height);
 
     private sealed class PassSlot : IDisposable
     {
@@ -291,51 +291,64 @@ public class MultiPassRenderer : IDisposable
     {
         DisposeSlots();
 
-        var executionOrder = Core.PassGraph.executionOrder(project);
-        var selfReferencing = Core.PassGraph.selfReferencingPassNames(project);
-        var passesByName = Core.ShaderModel.allPasses(project)
-            .ToDictionary(pass => pass.Name);
-
-        foreach (var passName in executionOrder)
+        try
         {
-            if (!passesByName.TryGetValue(passName, out var pass))
+            var executionOrder = Core.PassGraph.executionOrder(project);
+            var selfReferencing = Core.PassGraph.selfReferencingPassNames(project);
+            var passesByName = Core.ShaderModel.allPasses(project)
+                .ToDictionary(pass => pass.Name);
+
+            foreach (var passName in executionOrder)
             {
-                continue;
+                if (!passesByName.TryGetValue(passName, out var pass))
+                {
+                    continue;
+                }
+
+                if (!hlslPasses.TryGetValue(passName, out var transpileResult))
+                {
+                    continue;
+                }
+
+                var bindings = Core.PassGraph.bufferChannelBindings(project, pass)
+                    .Select(binding => (binding.Item1, binding.Item2))
+                    .ToArray();
+
+                var assetBindings = Core.PassGraph.assetChannelBindings(pass)
+                    .Select(binding => ResolveAssetBinding(binding.Item1, binding.Item2))
+                    .Where(binding => binding is not null)
+                    .Select(binding => binding!.Value)
+                    .ToArray();
+
+                var pixelShaderBytecode = Compiler.Compile(
+                    transpileResult.HlslSource,
+                    transpileResult.EntryPoint,
+                    $"videotoy-ps-{passName}",
+                    "ps_5_0",
+                    CompileFlags);
+
+                var slot = new PassSlot
+                {
+                    Name = passName,
+                    IsPingPong = selfReferencing.Contains(passName),
+                    BufferBindings = bindings,
+                    AssetBindings = assetBindings,
+                    PixelShader = _sharedContext.Device.CreatePixelShader(pixelShaderBytecode.Span)
+                };
+
+                _orderedSlots.Add(slot);
+                _slotsByName[passName] = slot;
             }
-
-            if (!hlslPasses.TryGetValue(passName, out var transpileResult))
-            {
-                continue;
-            }
-
-            var bindings = Core.PassGraph.bufferChannelBindings(project, pass)
-                .Select(binding => (binding.Item1, binding.Item2))
-                .ToArray();
-
-            var assetBindings = Core.PassGraph.assetChannelBindings(pass)
-                .Select(binding => ResolveAssetBinding(binding.Item1, binding.Item2))
-                .Where(binding => binding is not null)
-                .Select(binding => binding!.Value)
-                .ToArray();
-
-            var pixelShaderBytecode = Compiler.Compile(
-                transpileResult.HlslSource,
-                transpileResult.EntryPoint,
-                $"videotoy-ps-{passName}",
-                "ps_5_0",
-                CompileFlags);
-
-            var slot = new PassSlot
-            {
-                Name = passName,
-                IsPingPong = selfReferencing.Contains(passName),
-                BufferBindings = bindings,
-                AssetBindings = assetBindings,
-                PixelShader = _sharedContext.Device.CreatePixelShader(pixelShaderBytecode.Span)
-            };
-
-            _orderedSlots.Add(slot);
-            _slotsByName[passName] = slot;
+        }
+        catch
+        {
+            // Une passe suivante qui échoue à compiler (HLSL malformé issu
+            // du transpileur) ne doit pas laisser les ID3D11PixelShader déjà
+            // créés pour les passes précédentes fuir jusqu'au prochain
+            // chargement réussi : les libérer immédiatement ici plutôt que
+            // d'attendre le prochain DisposeSlots() (ou Dispose() final).
+            DisposeSlots();
+            throw;
         }
     }
 
@@ -432,7 +445,7 @@ public class MultiPassRenderer : IDisposable
         _sharedContext.ImmediateContext.UpdateSubresource(image.PixelsBgra, texture, 0, rowPitch);
 
         var view = _sharedContext.Device.CreateShaderResourceView(texture);
-        return new BoundAsset(texture, view, AssetKind.Image);
+        return new BoundAsset(texture, view, AssetKind.Image, image.Width, image.Height);
     }
 
     private BoundAsset CreateDynamicAsset(int width, int height, AssetKind kind)
@@ -453,7 +466,7 @@ public class MultiPassRenderer : IDisposable
 
         var texture = _sharedContext.Device.CreateTexture2D(description);
         var view = _sharedContext.Device.CreateShaderResourceView(texture);
-        return new BoundAsset(texture, view, kind);
+        return new BoundAsset(texture, view, kind, width, height);
     }
 
     public void Resize(RenderTargetSize size)
@@ -478,11 +491,24 @@ public class MultiPassRenderer : IDisposable
             throw new InvalidOperationException("MultiPassRenderer has not been initialized; call Initialize first.");
         }
 
-        RefreshDynamicAssets(timeSeconds);
-
-        foreach (var slot in _orderedSlots)
+        try
         {
-            RenderSlot(slot, timeSeconds, deltaSeconds, frameIndex);
+            RefreshDynamicAssets(timeSeconds);
+
+            foreach (var slot in _orderedSlots)
+            {
+                RenderSlot(slot, timeSeconds, deltaSeconds, frameIndex);
+            }
+        }
+        catch (SharpGen.Runtime.SharpGenException ex)
+        {
+            // Couvre notamment un pilote qui plante, un timeout TDR, ou un
+            // GPU débranché/changé en cours d'export : sans cette traduction,
+            // l'appelant ne verrait qu'un HRESULT COM opaque plutôt qu'un
+            // message actionnable (voir GpuDeviceLostException).
+            throw new GpuDeviceLostException(
+                $"The GPU rendering device failed while rendering frame {frameIndex} (driver crash, GPU removed/reset, or a timeout). Please retry the render.",
+                ex);
         }
 
         foreach (var slot in _orderedSlots)
@@ -502,7 +528,7 @@ public class MultiPassRenderer : IDisposable
     {
         var target = slot.WriteTarget;
 
-        UpdateUniforms(timeSeconds, deltaSeconds, frameIndex);
+        UpdateUniforms(slot, timeSeconds, deltaSeconds, frameIndex);
         UpdateCustomUniforms();
 
         target.Clear(0f, 0f, 0f, 1f);
@@ -628,8 +654,41 @@ public class MultiPassRenderer : IDisposable
             _ => _size.Height
         };
 
-    private void UpdateUniforms(double timeSeconds, double deltaSeconds, int frameIndex)
+    /// <summary>
+    /// Résout <c>iChannelResolutionN</c> pour chaque channel 0-3 de
+    /// <paramref name="slot"/> : la résolution (largeur, hauteur, 1) de la
+    /// texture effectivement liée (buffer d'une autre passe — toujours
+    /// dimensionné à <see cref="_size"/> — ou asset image/vidéo/spectre
+    /// audio, voir <see cref="BoundAsset"/>), ou zéro si aucune texture
+    /// n'est liée à ce channel, conformément à la convention Shadertoy.
+    /// </summary>
+    private Vector4[] ResolveChannelResolutions(PassSlot slot)
     {
+        var resolutions = new[] { Vector4.Zero, Vector4.Zero, Vector4.Zero, Vector4.Zero };
+
+        foreach (var (channelIndex, _) in slot.BufferBindings)
+        {
+            if (channelIndex is >= 0 and < 4)
+            {
+                resolutions[channelIndex] = new Vector4(_size.Width, _size.Height, 1f, 0f);
+            }
+        }
+
+        foreach (var (channelIndex, assetPath, _) in slot.AssetBindings)
+        {
+            if (channelIndex is >= 0 and < 4 && _boundAssets.TryGetValue(assetPath, out var boundAsset))
+            {
+                resolutions[channelIndex] = new Vector4(boundAsset.Width, boundAsset.Height, 1f, 0f);
+            }
+        }
+
+        return resolutions;
+    }
+
+    private void UpdateUniforms(PassSlot slot, double timeSeconds, double deltaSeconds, int frameIndex)
+    {
+        var channelResolutions = ResolveChannelResolutions(slot);
+
         var uniforms = new ShadertoyUniformsBuffer
         {
             Resolution = new Vector3(_size.Width, _size.Height, 1f),
@@ -638,12 +697,20 @@ public class MultiPassRenderer : IDisposable
             Frame = frameIndex,
             SampleRate = 44100f,
             Padding0 = 0f,
+            // iMouse et iDate restent volontairement figés à zéro : le pipeline
+            // de rendu est déterministe (voir la doc du projet) et ne dépend
+            // jamais de l'horloge murale ni d'une interaction souris en temps
+            // réel — une valeur non nulle changerait le résultat d'un export
+            // selon l'instant ou la machine, ce que ce renderer garantit
+            // justement de ne jamais faire. Un shader Shadertoy qui teste
+            // `iMouse.z > 0.0` se comporte donc comme si le bouton n'avait
+            // jamais été pressé, ce qui est le seul état reproductible.
             Mouse = Vector4.Zero,
             Date = Vector4.Zero,
-            ChannelResolution0 = Vector4.Zero,
-            ChannelResolution1 = Vector4.Zero,
-            ChannelResolution2 = Vector4.Zero,
-            ChannelResolution3 = Vector4.Zero
+            ChannelResolution0 = channelResolutions[0],
+            ChannelResolution1 = channelResolutions[1],
+            ChannelResolution2 = channelResolutions[2],
+            ChannelResolution3 = channelResolutions[3]
         };
 
         var context = _sharedContext.ImmediateContext;

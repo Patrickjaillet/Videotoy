@@ -25,14 +25,13 @@
   "onboarding.step3.body": "Mettez plusieurs exports en file d'attente et laissez-les s'enchaîner automatiquement. Ajoutez l'export actuel depuis la section « File de rendu » du panneau de paramètres, ou depuis la barre d'outils.",
 
   "viewport.dropHint": "Déposez un fichier shader ici",
-  "viewport.shaderLoaded.previewPending": "La prévisualisation sera disponible dans une future version",
   "viewport.timeline.currentTime": "{0:0.00}s",
 
   "statusBar.shaderLanguage.label": "Langage",
   "statusBar.shaderLanguage.tooltip": "Langage source détecté du shader — cliquer pour corriger si la détection est erronée.",
-  "statusBar.currentFrame": "Frame {0}",
+  "statusBar.currentFrame": "Image {0}",
   "statusBar.currentFps": "{0:0.0} IPS",
-  "statusBar.frameCount.label": "Frame ",
+  "statusBar.frameCount.label": "Image ",
   "statusBar.frameCount.separator": " / ",
 
   "issues.panel.title": "Problèmes du shader",
@@ -158,7 +157,7 @@
   "panel.durationMode.manual": "Durée manuelle",
   "panel.durationMode.seamlessLoop": "Boucle parfaite",
   "panel.durationMode.unit.seconds": "Secondes",
-  "panel.durationMode.unit.frames": "Frames",
+  "panel.durationMode.unit.frames": "Images",
   "panel.durationMode.loopSecondsPerLoop": "secondes / boucle",
   "panel.durationMode.loopHint": "Le nombre exact de frames de la boucle est arrondi à la frame entière la plus proche ; voir l'avertissement ci-dessous si cela introduit un léger décalage au raccord.",
   "panel.durationMode.exclusiveEndFrame": "Frame de fin exclusive",
@@ -216,7 +215,7 @@
 
   "export.progress.title": "Export en cours...",
   "export.progress.percent": "{0:0}%",
-  "export.progress.frameCount": "Frame {0} / {1}",
+  "export.progress.frameCount": "Image {0} / {1}",
   "export.progress.eta": "Temps restant {0}",
   "export.progress.estimating": "Estimation en cours...",
   "export.error.title": "Échec de l'export",

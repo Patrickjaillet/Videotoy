@@ -90,7 +90,7 @@ public sealed class AnimatedImageExportPipeline
         {
             var framesCompleted = 0;
 
-            foreach (var frame in _frameSequenceRenderer.RenderSequence(durationMode, frameRate, cancellationToken))
+            await foreach (var frame in _frameSequenceRenderer.RenderSequence(durationMode, frameRate, cancellationToken).ConfigureAwait(false))
             {
                 await _ffmpegService.WriteFrameAsync(frame.PixelsRgba, cancellationToken).ConfigureAwait(false);
 

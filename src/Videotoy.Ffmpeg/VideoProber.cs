@@ -20,14 +20,18 @@ public sealed class VideoProber
         @"Stream #\d+:\d+.*Video:.*?(\d{2,5})x(\d{2,5})[^,]*,.*?(\d+(?:\.\d+)?)\s*fps", RegexOptions.Compiled);
 
     private readonly FfmpegLocator _locator;
+    private readonly FfmpegIntegrityVerifier _integrityVerifier;
 
-    public VideoProber(FfmpegLocator locator)
+    public VideoProber(FfmpegLocator locator, FfmpegIntegrityVerifier integrityVerifier)
     {
         _locator = locator;
+        _integrityVerifier = integrityVerifier;
     }
 
     public async Task<VideoProbeResult> ProbeAsync(string filePath, CancellationToken cancellationToken = default)
     {
+        _integrityVerifier.EnsureStillValid();
+
         var startInfo = new ProcessStartInfo
         {
             FileName = _locator.ResolveExecutablePath(),

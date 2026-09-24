@@ -44,10 +44,17 @@ public sealed class WgslTranspilerProcess
                 CreateNoWindow = true
             };
 
-            // TODO: vérifier ces flags contre la sortie réelle de
-            // `tint.exe --help` au moment de vendre le binaire (voir
-            // tools/tint/README.md) — hypothèse non vérifiable en ligne au
-            // moment d'écrire ce code.
+            // Invocation `<fichier d'entrée> --format hlsl -o <fichier de
+            // sortie>` : conforme à la CLI documentée du outil `tint` du
+            // projet Dawn (src/tint/cmd/tint/main.cc), mais toujours à
+            // reconfirmer avec le binaire réellement vendu (`tint.exe
+            // --help`, voir tools/tint/README.md) avant une première
+            // release avec support WGSL — un binaire tiers recompilé ou une
+            // version différente de Tint pourrait exposer une CLI légèrement
+            // différente. Si `InvokeAsync` échoue systématiquement pour tout
+            // fichier `.wgsl`, c'est le premier point à vérifier : le
+            // message d'erreur ci-dessous inclut le code de sortie et
+            // stderr précisément pour ce diagnostic.
             startInfo.ArgumentList.Add(inputPath);
             startInfo.ArgumentList.Add("--format");
             startInfo.ArgumentList.Add("hlsl");

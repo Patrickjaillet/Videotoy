@@ -38,14 +38,16 @@ public sealed class HardwareEncoderProbe
         };
 
     private readonly FfmpegLocator _locator;
+    private readonly FfmpegIntegrityVerifier _integrityVerifier;
     private readonly ConcurrentDictionary<string, HardwareEncoderAvailability> _availabilityCache = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private HashSet<string>? _compiledEncoderNames;
 
-    public HardwareEncoderProbe(FfmpegLocator locator)
+    public HardwareEncoderProbe(FfmpegLocator locator, FfmpegIntegrityVerifier integrityVerifier)
     {
         _locator = locator;
+        _integrityVerifier = integrityVerifier;
     }
 
     /// <summary>
@@ -139,6 +141,8 @@ public sealed class HardwareEncoderProbe
 
         try
         {
+            _integrityVerifier.EnsureStillValid();
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = _locator.ResolveExecutablePath(),
@@ -181,7 +185,10 @@ public sealed class HardwareEncoderProbe
         {
             // FFmpeg introuvable/injoignable : aucun encodeur matériel ne sera
             // jamais considéré disponible, le repli logiciel s'applique donc
-            // systématiquement — comportement sûr par défaut.
+            // systématiquement — comportement sûr par défaut. Tracée (et non
+            // silencieuse) pour rester diagnosticable depuis un rapport de bug.
+            System.Diagnostics.Trace.TraceWarning(
+                $"HardwareEncoderProbe: failed to list compiled FFmpeg encoders: {ex}");
         }
 
         _compiledEncoderNames = names;
@@ -198,6 +205,8 @@ public sealed class HardwareEncoderProbe
     {
         try
         {
+            _integrityVerifier.EnsureStillValid();
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = _locator.ResolveExecutablePath(),

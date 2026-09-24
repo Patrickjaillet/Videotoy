@@ -18,7 +18,7 @@ using CoreLoopCalculator = Videotoy.Core.LoopCalculator;
 
 namespace Videotoy.App.ViewModels;
 
-public sealed partial class MainWindowViewModel : ObservableObject
+public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 {
     private static readonly string[] OpenFileDialogExtensions =
         { "*.glsl", "*.frag", "*.wgsl", "*.hlsl", "*.hlsli", "*.json", "*.shadertoy" };
@@ -3489,5 +3489,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         LoadExportPresetCommand.NotifyCanExecuteChanged();
         DeleteExportPresetCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Se désabonne de <see cref="_renderQueueProcessor"/>, un singleton DI
+    /// injecté qui vit indépendamment de cette instance : sans appel
+    /// explicite (voir <c>App.OnExit</c>, qui dispose le conteneur DI, donc
+    /// tout service enregistré implémentant <see cref="IDisposable"/>), ces
+    /// abonnements resteraient vivants au-delà de la durée de vie voulue si
+    /// une seconde instance de ce ViewModel était un jour créée. <see cref="_previewClock"/>
+    /// et <see cref="_historyStack"/> ne sont en revanche jamais partagés
+    /// (possédés en exclusivité par cette instance), leur laisser vivre
+    /// n'est donc jamais une fuite.
+    /// </summary>
+    public void Dispose()
+    {
+        _renderQueueProcessor.ItemProgressChanged -= OnRenderQueueItemProgressChanged;
+        _renderQueueProcessor.ItemStatusChanged -= OnRenderQueueItemStatusChanged;
+        _renderQueueProcessor.QueueCompleted -= OnRenderQueueCompleted;
     }
 }
