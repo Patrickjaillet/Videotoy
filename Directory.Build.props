@@ -11,9 +11,9 @@
     <Company>Patrick JAILLET</Company>
     <Product>Videotoy</Product>
     <Copyright>Copyright © 2026 Patrick JAILLET</Copyright>
-    <VersionPrefix>2.2.2</VersionPrefix>
-    <FileVersion>2.2.2.0</FileVersion>
-    <AssemblyVersion>2.2.2.0</AssemblyVersion>
-    <InformationalVersion>2.2.2</InformationalVersion>
+    <VersionPrefix>2.2.3</VersionPrefix>
+    <FileVersion>2.2.3.0</FileVersion>
+    <AssemblyVersion>2.2.3.0</AssemblyVersion>
+    <InformationalVersion>2.2.3</InformationalVersion>
   </PropertyGroup>
 </Project>

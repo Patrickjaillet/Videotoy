@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-09-24
+
 ### Changed
 
 - Lowered the minimum supported OS from Windows 11 (build 22000) to Windows
