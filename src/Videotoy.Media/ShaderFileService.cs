@@ -170,7 +170,11 @@ public sealed class ShaderFileService
         IDictionary<string, TextureAsset> textures,
         ICollection<Videotoy.Core.ShaderModel.ShaderIssue> issues)
     {
-        var resolvedPath = ResolveAssetPath(baseDirectory, relativeOrAbsolutePath);
+        if (!TryResolveAssetPath(baseDirectory, relativeOrAbsolutePath, out var resolvedPath))
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Texture path escapes the shader's directory: '{relativeOrAbsolutePath}'."));
+            return;
+        }
 
         if (!File.Exists(resolvedPath))
         {
@@ -195,7 +199,11 @@ public sealed class ShaderFileService
         IDictionary<string, AudioTrack> audioTracks,
         ICollection<Videotoy.Core.ShaderModel.ShaderIssue> issues)
     {
-        var resolvedPath = ResolveAssetPath(baseDirectory, relativeOrAbsolutePath);
+        if (!TryResolveAssetPath(baseDirectory, relativeOrAbsolutePath, out var resolvedPath))
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Audio path escapes the shader's directory: '{relativeOrAbsolutePath}'."));
+            return;
+        }
 
         if (!File.Exists(resolvedPath))
         {
@@ -220,7 +228,11 @@ public sealed class ShaderFileService
         IDictionary<string, Videotoy.Ffmpeg.VideoTextureSource> videoSources,
         ICollection<Videotoy.Core.ShaderModel.ShaderIssue> issues)
     {
-        var resolvedPath = ResolveAssetPath(baseDirectory, relativeOrAbsolutePath);
+        if (!TryResolveAssetPath(baseDirectory, relativeOrAbsolutePath, out var resolvedPath))
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Video path escapes the shader's directory: '{relativeOrAbsolutePath}'."));
+            return;
+        }
 
         if (!File.Exists(resolvedPath))
         {
@@ -243,8 +255,34 @@ public sealed class ShaderFileService
         }
     }
 
-    private static string ResolveAssetPath(string baseDirectory, string assetPath)
+    /// <summary>
+    /// Résout <paramref name="assetPath"/> (le champ <c>src</c> d'un
+    /// <c>iChannel</c>, tel que déclaré dans un export Shadertoy JSON — donc
+    /// un contenu potentiellement partagé/téléchargé, jamais du texte de
+    /// confiance) relativement à <paramref name="baseDirectory"/>, et refuse
+    /// tout résultat en dehors de ce répertoire : un export JSON de shader
+    /// ne référence jamais légitimement un média en dehors de son propre
+    /// dossier, donc <c>"../../../../Windows/win.ini"</c> ou un chemin
+    /// absolu pointant ailleurs sur le disque (<c>C:\Windows\win.ini</c>)
+    /// sont rejetés plutôt que silencieusement chargés comme texture/piste
+    /// audio/vidéo.
+    /// </summary>
+    private static bool TryResolveAssetPath(string baseDirectory, string assetPath, out string resolvedPath)
     {
-        return Path.IsPathRooted(assetPath) ? assetPath : Path.Combine(baseDirectory, assetPath);
+        var normalizedBaseDirectory = Path.GetFullPath(baseDirectory);
+        var candidatePath = Path.GetFullPath(Path.Combine(normalizedBaseDirectory, assetPath));
+
+        var baseDirectoryWithSeparator = normalizedBaseDirectory.EndsWith(Path.DirectorySeparatorChar)
+            ? normalizedBaseDirectory
+            : normalizedBaseDirectory + Path.DirectorySeparatorChar;
+
+        if (!candidatePath.StartsWith(baseDirectoryWithSeparator, StringComparison.OrdinalIgnoreCase))
+        {
+            resolvedPath = string.Empty;
+            return false;
+        }
+
+        resolvedPath = candidatePath;
+        return true;
     }
 }

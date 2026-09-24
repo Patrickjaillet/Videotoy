@@ -136,7 +136,7 @@ public sealed class ImageSequenceExportPipeline
         var firstFrameIndexWritten = -1;
         var lastFrameIndexWritten = -1;
 
-        foreach (var frame in _frameSequenceRenderer.RenderSequence(settings.Duration, settings.FrameRate, cancellationToken))
+        await foreach (var frame in _frameSequenceRenderer.RenderSequence(settings.Duration, settings.FrameRate, cancellationToken).ConfigureAwait(false))
         {
             var fileName = Videotoy.Core.ImageSequenceExportSettingsValidator.resolveFrameFileName(
                 settings.NamingPattern, frame.Index, frame.TimeSeconds, extension);

@@ -18,13 +18,20 @@ let private tryGetProperty (element: JsonElement) (name: string) : JsonElement o
     | true, value -> Some value
     | false, _ -> None
 
-/// Wrapper nul-safe autour de `JsonElement.GetString()`, qui est annoté
-/// nullable en .NET 8 même si la valeur JSON est presque toujours une
-/// vraie chaîne. Convertit le résultat en `string option` idiomatique F#.
+/// Wrapper nul-safe et type-safe autour de `JsonElement.GetString()` :
+/// `GetString()` lève `InvalidOperationException` si la valeur JSON à cet
+/// emplacement n'est pas une chaîne (ex. un fichier `.shadertoy` mal formé
+/// ou modifié à la main avec `"src": 123`) — un fichier partagé/téléchargé
+/// ne doit jamais planter tout le flux "Ouvrir un shader" pour un champ mal
+/// typé, `None` est un résultat valide ici. Convertit sinon en `string
+/// option` idiomatique F#.
 let private tryGetStringValue (element: JsonElement) : string option =
-    match element.GetString() with
-    | null -> None
-    | value -> Some value
+    if element.ValueKind <> JsonValueKind.String then
+        None
+    else
+        match element.GetString() with
+        | null -> None
+        | value -> Some value
 
 let private parseChannelInput (inputElement: JsonElement) : ChannelSource option =
     let typeName =
@@ -59,7 +66,10 @@ let private parseChannel (passElement: JsonElement) (channelIndex: int) : Channe
         inputsElement.EnumerateArray()
         |> Seq.tryFind (fun inputElement ->
             match tryGetProperty inputElement "channel" with
-            | Some channelElement -> channelElement.GetInt32() = channelIndex
+            | Some channelElement ->
+                match channelElement.TryGetInt32() with
+                | true, value -> value = channelIndex
+                | false, _ -> false
             | None -> false)
         |> Option.bind parseChannelInput
 
@@ -143,4 +153,10 @@ let parse (jsonText: string) (filePath: string) : Result<ShaderProject, ShaderIs
                       SourceLanguage = Videotoy.Core.ShaderModel.Glsl }
     with
     | :? JsonException as ex ->
+        Result.Error [ errorIssue "Image" 1 (sprintf "Malformed Shadertoy JSON export: %s" ex.Message) ]
+    | :? System.InvalidOperationException as ex ->
+        // Filet de sécurité : les accesseurs `JsonElement` ci-dessus sont
+        // désormais tous gardés par leur `ValueKind`, mais un champ
+        // inattendu dans un export Shadertoy tiers ne doit jamais faire
+        // planter tout le flux "Ouvrir un shader" pour autant.
         Result.Error [ errorIssue "Image" 1 (sprintf "Malformed Shadertoy JSON export: %s" ex.Message) ]

@@ -17,10 +17,12 @@ namespace Videotoy.Ffmpeg;
 public sealed class VideoFrameDecoder
 {
     private readonly FfmpegLocator _locator;
+    private readonly FfmpegIntegrityVerifier _integrityVerifier;
 
-    public VideoFrameDecoder(FfmpegLocator locator)
+    public VideoFrameDecoder(FfmpegLocator locator, FfmpegIntegrityVerifier integrityVerifier)
     {
         _locator = locator;
+        _integrityVerifier = integrityVerifier;
     }
 
     public async Task<byte[]> DecodeFrameBgraAsync(
@@ -30,6 +32,8 @@ public sealed class VideoFrameDecoder
         int height,
         CancellationToken cancellationToken = default)
     {
+        _integrityVerifier.EnsureStillValid();
+
         var startInfo = new ProcessStartInfo
         {
             FileName = _locator.ResolveExecutablePath(),

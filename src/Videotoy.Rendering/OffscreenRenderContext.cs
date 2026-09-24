@@ -161,42 +161,55 @@ public sealed class OffscreenRenderContext : IDisposable
     {
         EnsureInitialized();
 
-        ImmediateContext.CopyResource(_stagingTexture!, _colorTexture!);
-
-        var mapped = ImmediateContext.Map(_stagingTexture!, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
-
         try
         {
-            var rowSizeInBytes = Size.Width * 4;
-            var totalSizeInBytes = rowSizeInBytes * Size.Height;
-            var pixels = new byte[totalSizeInBytes];
+            ImmediateContext.CopyResource(_stagingTexture!, _colorTexture!);
 
-            unsafe
+            var mapped = ImmediateContext.Map(_stagingTexture!, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
+
+            try
             {
-                var sourceBase = (byte*)mapped.DataPointer;
-                fixed (byte* destinationBase = pixels)
+                var rowSizeInBytes = Size.Width * 4;
+                var totalSizeInBytes = rowSizeInBytes * Size.Height;
+                var pixels = new byte[totalSizeInBytes];
+
+                unsafe
                 {
-                    if (mapped.RowPitch == rowSizeInBytes)
+                    var sourceBase = (byte*)mapped.DataPointer;
+                    fixed (byte* destinationBase = pixels)
                     {
-                        Buffer.MemoryCopy(sourceBase, destinationBase, totalSizeInBytes, totalSizeInBytes);
-                    }
-                    else
-                    {
-                        for (var row = 0; row < Size.Height; row++)
+                        if (mapped.RowPitch == rowSizeInBytes)
                         {
-                            var sourceRow = sourceBase + (row * mapped.RowPitch);
-                            var destinationRow = destinationBase + (row * rowSizeInBytes);
-                            Buffer.MemoryCopy(sourceRow, destinationRow, rowSizeInBytes, rowSizeInBytes);
+                            Buffer.MemoryCopy(sourceBase, destinationBase, totalSizeInBytes, totalSizeInBytes);
+                        }
+                        else
+                        {
+                            for (var row = 0; row < Size.Height; row++)
+                            {
+                                var sourceRow = sourceBase + (row * mapped.RowPitch);
+                                var destinationRow = destinationBase + (row * rowSizeInBytes);
+                                Buffer.MemoryCopy(sourceRow, destinationRow, rowSizeInBytes, rowSizeInBytes);
+                            }
                         }
                     }
                 }
-            }
 
-            return pixels;
+                return pixels;
+            }
+            finally
+            {
+                ImmediateContext.Unmap(_stagingTexture!, 0);
+            }
         }
-        finally
+        catch (SharpGen.Runtime.SharpGenException ex)
         {
-            ImmediateContext.Unmap(_stagingTexture!, 0);
+            // Couvre notamment un pilote qui plante, un timeout TDR, ou un
+            // GPU débranché/changé en cours d'export : sans cette traduction,
+            // l'appelant ne verrait qu'un HRESULT COM opaque plutôt qu'un
+            // message actionnable (voir GpuDeviceLostException).
+            throw new GpuDeviceLostException(
+                "The GPU rendering device failed while reading back a rendered frame (driver crash, GPU removed/reset, or a timeout). Please retry.",
+                ex);
         }
     }
 

@@ -50,7 +50,12 @@ public sealed partial class VideoChannelViewModel : ObservableObject
     /// </summary>
     public async Task HandleFileDroppedAsync(string newFilePath)
     {
-        var probe = await _videoTextureLoader.ProbeAsync(newFilePath).ConfigureAwait(false);
+        // Pas de ConfigureAwait(false) : les affectations ci-dessous
+        // déclenchent des notifications INotifyPropertyChanged liées à des
+        // contrôles WPF, qui doivent impérativement rester sur le thread UI
+        // (seul appelant : le gestionnaire de glisser-déposer de la fenêtre
+        // principale, déjà sur le thread UI).
+        var probe = await _videoTextureLoader.ProbeAsync(newFilePath);
         Source.FilePath = newFilePath;
         Source.Probe = probe;
         OnPropertyChanged(nameof(FileName));

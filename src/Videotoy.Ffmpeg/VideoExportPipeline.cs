@@ -133,8 +133,8 @@ public sealed class VideoExportPipeline
         {
             var framesCompleted = 0;
 
-            foreach (var frame in _frameSequenceRenderer.RenderSequence(
-                settings.Duration, settings.FrameRate, cancellationToken))
+            await foreach (var frame in _frameSequenceRenderer.RenderSequence(
+                settings.Duration, settings.FrameRate, cancellationToken).ConfigureAwait(false))
             {
                 await _ffmpegService.WriteFrameAsync(frame.PixelsRgba, cancellationToken).ConfigureAwait(false);
 

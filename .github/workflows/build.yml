@@ -23,3 +23,6 @@ jobs:
 
       - name: Build
         run: dotnet build Videotoy.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/Videotoy.Tests/Videotoy.Tests.csproj -c Release --no-build

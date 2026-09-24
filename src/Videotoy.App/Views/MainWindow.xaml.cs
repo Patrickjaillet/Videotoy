@@ -233,7 +233,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        await viewModel.HandleFileDroppedAsync(files[0]);
+        try
+        {
+            await viewModel.HandleFileDroppedAsync(files[0]);
+        }
+        catch (Exception ex)
+        {
+            // async void : sans ce try/catch, tout échec de sondage du
+            // fichier déposé (vidéo corrompue/format non supporté) remonte
+            // au gestionnaire d'exceptions global de l'application et ferme
+            // Videotoy entièrement pour ce qui n'est qu'un fichier invalide.
+            MessageBox.Show(
+                $"Could not load the dropped video file: {ex.Message}",
+                "Videotoy — Invalid video file",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
