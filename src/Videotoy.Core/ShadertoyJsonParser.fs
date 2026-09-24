@@ -66,11 +66,16 @@ let private parseChannel (passElement: JsonElement) (channelIndex: int) : Channe
         inputsElement.EnumerateArray()
         |> Seq.tryFind (fun inputElement ->
             match tryGetProperty inputElement "channel" with
-            | Some channelElement ->
+            | Some channelElement when channelElement.ValueKind = JsonValueKind.Number ->
+                // TryGetInt32 lève encore InvalidOperationException si
+                // ValueKind n'est pas Number (ex. "channel": "zero") : le
+                // garde-fou porte donc sur ValueKind d'abord, TryGetInt32 ne
+                // protégeant que contre un nombre mal formé (décimal,
+                // dépassement de capacité), pas contre un type différent.
                 match channelElement.TryGetInt32() with
                 | true, value -> value = channelIndex
                 | false, _ -> false
-            | None -> false)
+            | _ -> false)
         |> Option.bind parseChannelInput
 
 let private parsePassCode (passElement: JsonElement) : string =
