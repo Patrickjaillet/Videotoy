@@ -1,6 +1,6 @@
 # Videotoy
 
-**Videotoy** is a Windows 11 desktop application that turns a
+**Videotoy** is a Windows desktop application that turns a
 [Shadertoy](https://www.shadertoy.com)-style GLSL, WGSL, or HLSL shader into
 a video or animated image file, rendered frame by frame through a fully
 **deterministic** pipeline — no dependency on the host machine's real-time
@@ -124,8 +124,9 @@ external tool or dependency needs to be installed separately.
 
 ### Interface
 
-- Custom, chromeless window with the Windows 11 Mica backdrop, rounded
-  corners, and a single light theme
+- Custom, chromeless window with the Windows 11 Mica backdrop and rounded
+  corners (gracefully degrading to a standard window on Windows 10), and a
+  single light theme
 - The render settings panel is organized into thematic, collapsible
   sections (Resolution/FPS, Duration/Loop, Codec/Container, Inputs, Render
   Queue), and can itself be retracted entirely
@@ -145,7 +146,8 @@ external tool or dependency needs to be installed separately.
 Download the latest installer from the
 [Releases](https://github.com/patrickjaillet/Videotoy/releases) page and run
 it. FFmpeg is bundled with the installer — no additional dependency needs to
-be installed separately. Videotoy targets **Windows 11** only.
+be installed separately. Videotoy requires **Windows 10 version 2004 (build
+19041) or later**, including Windows 11.
 
 ## Usage
 

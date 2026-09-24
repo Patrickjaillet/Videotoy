@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Lowered the minimum supported OS from Windows 11 (build 22000) to Windows
+  10 version 2004 / build 19041 — the same baseline already required by the
+  app's target framework (`net8.0-windows10.0.19041.0`). Nothing in the
+  render/export pipeline actually required Windows 11; the installer's
+  `MinVersion` was the only real blocker. The Windows 11 Mica backdrop and
+  rounded window corners (`WindowChromeHelper`) already degrade gracefully
+  to a standard window on Windows 10, since `DwmSetWindowAttribute` simply
+  no-ops on unsupported attributes rather than failing
+
 ## [2.2.2] - 2026-09-24
 
 ### Fixed

@@ -69,7 +69,7 @@ UninstallDisplayName={#MyAppName}
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
 ShowLanguageDialog=auto
-MinVersion=10.0.22000
+MinVersion=10.0.19041
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Windows 11
+- Windows 10 version 2004 (build 19041) or later, including Windows 11
 - .NET 8 SDK
 - Visual Studio 2022 (17.8 or later) with the ".NET desktop development"
   and "F# desktop language support" workloads, or the `dotnet` CLI
