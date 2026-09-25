@@ -1097,18 +1097,22 @@ rendu), et transitions d'apparition/disparition pour panneaux et boutons.
   utilisée par le site GitHub Pages doivent être regénérées une fois la
   nouvelle UI stabilisée, pour ne pas présenter une interface obsolète aux
   futurs utilisateurs/contributeurs.
-  > Fait partiellement : `docs/scs/screenshot.png` (référencée par
-  > `README.md`) régénérée en lançant l'app réelle, en chargeant un petit
-  > shader de démo (dégradé animé `cos(iTime+uv...)`) et en capturant la
-  > fenêtre pendant la lecture — montre la nouvelle palette vitamine
-  > (barre d'outils colorée par contexte, dégradés, fond texturé) en usage
-  > réel. `docs/assets/img/shot-about.png` (page GitHub Pages) régénérée de
-  > la même façon depuis la vraie fenêtre "À propos" (logo en dégradé +
-  > glow violet, bouton fermer rose). Non fait dans cette passe :
-  > `shot-loop-export.png`/`shot-render-panel.png`/`shot-resolution-presets.png`
-  > — ces captures documentent des états UI précis (aperçu de bouclage
-  > parfait, sélecteur de canal alpha, menu déroulant de résolution ouvert)
-  > qui demandent de reproduire un scénario exact plutôt qu'un simple
-  > changement de palette ; laissé pour une passe de documentation dédiée
-  > plutôt que de publier des captures dépareillées ou approximatives sur
-  > le site public.
+  > Fait : `docs/scs/screenshot.png` (référencée par `README.md`) régénérée
+  > en lançant l'app réelle, en chargeant un shader fractal (Mandelbrot
+  > coloré animé) et en capturant la fenêtre pendant la lecture — montre la
+  > nouvelle palette vitamine (barre d'outils colorée par contexte,
+  > dégradés, fond texturé) en usage réel. Les 4 captures de la page GitHub
+  > Pages (`docs/index.html`) régénérées de la même façon depuis l'app
+  > réelle : `shot-about.png` (fenêtre "À propos", logo en dégradé + glow
+  > violet, bouton fermer rose) ; `shot-render-panel.png` (aperçu live du
+  > fractal + panneau de rendu en mode "Boucle parfaite") ;
+  > `shot-loop-export.png` (aperçu du raccord de boucle généré via le vrai
+  > bouton "Generate loop seam preview", montrant les vraies vignettes
+  > première/dernière frame) ; `shot-resolution-presets.png` (menu déroulant
+  > de résolution ouvert avec tous les presets réels : Preview/SD/HD/Full
+  > HD/4K UHD/4:3/16:9/9:16/Custom). Le texte "v2.2.3"/"v2.4.0" affiché dans
+  > le hero et la section téléchargement de `docs/index.html` mis à jour en
+  > conséquence. `docs/scs/screenshot.png` et `shot-render-panel.png`
+  > compressés en PNG 256 couleurs via ImageMagick (perte visuelle
+  > imperceptible) pour ramener leur poids de ~1 Mo à respectivement 176 Ko
+  > et 112 Ko, cohérent avec le poids des autres images du site.
