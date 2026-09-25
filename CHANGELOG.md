@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-09-25
+
+### Fixed
+
+- WGSL shaders failed to render: the fragment entry point renaming logic
+  looked for a `: SV_Target` annotation directly on the function signature,
+  a form Tint's HLSL writer never actually produces. Real Tint output always
+  wraps the entry point in a pair of `<name>_inputs`/`<name>_outputs`
+  structs, with the output struct's field carrying the `SV_Target0`
+  annotation instead — so the renaming to `PSMain` (required by
+  `MultiPassRenderer`) silently never triggered. Found and fixed by
+  compiling `tint.exe` from source and running a real WGSL-to-HLSL
+  conversion through it, the first time the actual output of Tint's HLSL
+  writer was observed rather than assumed from documentation.
+
 ## [2.4.0] - 2026-09-25
 
 ### Added

@@ -45,16 +45,23 @@ public sealed class WgslTranspilerProcess
             };
 
             // Invocation `<fichier d'entrée> --format hlsl -o <fichier de
-            // sortie>` : conforme à la CLI documentée du outil `tint` du
-            // projet Dawn (src/tint/cmd/tint/main.cc), mais toujours à
-            // reconfirmer avec le binaire réellement vendu (`tint.exe
-            // --help`, voir tools/tint/README.md) avant une première
-            // release avec support WGSL — un binaire tiers recompilé ou une
-            // version différente de Tint pourrait exposer une CLI légèrement
-            // différente. Si `InvokeAsync` échoue systématiquement pour tout
-            // fichier `.wgsl`, c'est le premier point à vérifier : le
-            // message d'erreur ci-dessous inclut le code de sortie et
-            // stderr précisément pour ce diagnostic.
+            // sortie>` : vérifiée directement contre le code source du CLI
+            // Tint (dawn/src/tint/cmd/tint/main.cc, tel que vendored dans ce
+            // dépôt) plutôt que déduite de la documentation seule — usage
+            // exact `tint [options] <input-file>` (fichier d'entrée
+            // positionnel, jamais de sous-commande), option `--format`
+            // (raccourci `-f`) et option `--output-name` (raccourci `-o`,
+            // qui accepte un chemin de sortie pris tel quel, sans extension
+            // ajoutée). Si `--format` est omis, Tint déduit le format de
+            // l'extension du fichier de sortie et retombe sinon sur
+            // `spvasm` — on le passe donc toujours explicitement pour ne
+            // jamais dépendre de cette déduction. Reste néanmoins à
+            // confirmer que le binaire réellement embarqué dans
+            // `tools/tint/tint.exe` a été compilé avec `TINT_BUILD_HLSL_WRITER`
+            // activé (sinon `--format hlsl` échoue avec « HLSL writer not
+            // enabled in tint build », message identifiable dans stderr) :
+            // c'est une option de compilation, pas de la CLI, donc non
+            // vérifiable depuis le seul code source.
             startInfo.ArgumentList.Add(inputPath);
             startInfo.ArgumentList.Add("--format");
             startInfo.ArgumentList.Add("hlsl");

@@ -72,11 +72,25 @@ public sealed class WgslToHlslTranspiler
 
     /// <summary>
     /// Tint traduit l'attribut d'entrée <c>@fragment fn &lt;nom&gt;(...)</c>
-    /// WGSL vers un nom de fonction HLSL arbitraire (dépendant de Tint, pas
-    /// nécessairement <c>PSMain</c>) — cette passe renomme la fonction
-    /// repérée en <c>PSMain</c> pour rester cohérente avec les autres
-    /// chemins de langage, sans quoi <c>MultiPassRenderer</c> ne
-    /// retrouverait pas le point d'entrée attendu.
+    /// WGSL vers un point d'entrée HLSL nommé d'après ce même <c>&lt;nom&gt;</c>
+    /// (jamais <c>PSMain</c>), avec des structs d'E/S séparés générés par
+    /// Tint sous les noms <c>&lt;nom&gt;_inputs</c>/<c>&lt;nom&gt;_outputs</c>
+    /// — vérifié contre une compilation réelle du binaire vendu (une
+    /// hypothèse antérieure de ce fichier supposait à tort une signature
+    /// directement annotée <c>: SV_Target</c> sur la fonction, jamais générée
+    /// par les versions actuelles de Tint qui passent systématiquement par
+    /// ces structs). Exemple observé pour <c>@fragment fn mainImage(...)</c> :
+    /// <code>
+    /// struct mainImage_outputs { float4 tint_symbol : SV_Target0; };
+    /// struct mainImage_inputs { float4 fragCoord : SV_Position; };
+    /// mainImage_outputs mainImage(mainImage_inputs inputs) { ... }
+    /// </code>
+    /// Cette passe renomme le point d'entrée et ses deux structs associés en
+    /// <c>PSMain</c>/<c>PSMain_inputs</c>/<c>PSMain_outputs</c> pour rester
+    /// cohérente avec les autres chemins de langage, sans quoi
+    /// <c>MultiPassRenderer</c> ne retrouverait pas le point d'entrée attendu
+    /// (il compile toujours littéralement <c>"PSMain"</c>, voir
+    /// <see cref="TranspilePassAsync"/>).
     /// </summary>
     private static string NormalizeEntryPoint(string hlslSource)
     {
@@ -96,11 +110,12 @@ public sealed class WgslToHlslTranspiler
     }
 
     /// <summary>
-    /// Signature de fonction attendue en sortie HLSL de Tint pour un point
-    /// d'entrée fragment : <c>&lt;returnType&gt; &lt;name&gt;(...) : SV_Target</c>.
-    /// Marquée à vérifier/ajuster une fois la sortie réelle de Tint
-    /// observée (même posture que <see cref="WgslTranspilerProcess"/>).
+    /// Repère le point d'entrée fragment généré par Tint via son struct de
+    /// sortie <c>&lt;nom&gt;_outputs</c> (contenant un champ annoté
+    /// <c>SV_Target0</c>, <c>SV_Target1</c>, etc.) plutôt que via une
+    /// annotation <c>: SV_Target</c> directement sur une fonction — cette
+    /// dernière forme n'a jamais été observée en sortie réelle de Tint.
     /// </summary>
     private static readonly Regex FragmentEntryPointOutputRegex =
-        new(@"\w+\s+(\w+)\s*\([^)]*\)\s*:\s*SV_Target", RegexOptions.Compiled);
+        new(@"struct\s+(\w+)_outputs\s*\{[^}]*SV_Target\d*", RegexOptions.Compiled);
 }

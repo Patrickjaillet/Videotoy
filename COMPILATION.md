@@ -54,11 +54,14 @@ powershell -ExecutionPolicy Bypass -File tools/tint/generate-hash.ps1
 ```
 
 This produces `tools/tint/tint.exe.sha256`, tracked in source control, and
-must be regenerated whenever the embedded `tint.exe` binary is updated. See
-`tools/tint/README.md` for details, including a note on the exact CLI
-invocation assumption made by `WgslTranspilerProcess` (`Videotoy.Transpiler`)
-— verify it against the actual binary obtained, since it could not be
-confirmed without network access at the time this was written.
+must be regenerated whenever the embedded `tint.exe` binary is updated. The
+exact CLI invocation used by `WgslTranspilerProcess` (`Videotoy.Transpiler`)
+— `<input-file> --format hlsl -o <output-file>` — has been verified directly
+against Tint's own CLI source (`src/tint/cmd/tint/main.cc`) and against a
+locally built `tint.exe`, including a real WGSL-to-HLSL conversion; see
+`tools/tint/README.md` and `ROADMAP.md` for details. It should still be
+spot-checked (`tint.exe --help`) against any different `tint.exe` build you
+obtain, since Tint's CLI surface can change between versions.
 
 ## Building from the command line
 

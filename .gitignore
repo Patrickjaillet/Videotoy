@@ -24,3 +24,9 @@ installer/Output/
 !/tools/tint/tint.exe.sha256
 !/tools/tint/generate-hash.ps1
 !/tools/tint/README.md
+
+# Dépôt source complet de Dawn/Tint (Google, licence BSD-3-Clause), utilisé
+# une fois localement pour compiler tools/tint/tint.exe et vérifier la CLI
+# Tint contre son propre code source (voir ROADMAP.md) — bien trop volumineux
+# et hors de propos pour être commité dans ce dépôt.
+/dawn/

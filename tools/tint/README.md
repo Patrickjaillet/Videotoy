@@ -16,11 +16,15 @@ pleinement fonctionnels sans ce binaire.
 
 1. Obtenir une build Windows 64 bits de Tint (voir le projet Dawn/Chromium,
    licence BSD-3-Clause), fournissant un exécutable `tint.exe` capable de
-   convertir un fichier `.wgsl` en HLSL (`--format hlsl` ou équivalent —
-   **hypothèse à vérifier au moment de récupérer le binaire** : les flags
-   exacts de la CLI Tint doivent être confirmés via `tint.exe --help`,
-   voir `WgslTranspilerProcess.cs` où l'invocation exacte est isolée pour
-   rester facile à corriger si cette hypothèse s'avère fausse).
+   convertir un fichier `.wgsl` en HLSL (`--format hlsl -o <fichier>`).
+   Cette invocation a été vérifiée à la fois contre le code source du CLI
+   Tint (`src/tint/cmd/tint/main.cc`) et contre un binaire `tint.exe`
+   compilé localement (conversion WGSL→HLSL réelle réussie, shader chargé et
+   rendu dans l'app — voir `ROADMAP.md`) ; toujours confirmer via
+   `tint.exe --help` si le binaire obtenu provient d'une version de Tint
+   différente, la CLI pouvant évoluer d'une version à l'autre — voir
+   `WgslTranspilerProcess.cs` où l'invocation exacte est isolée pour rester
+   facile à corriger si un écart apparaît.
 2. Copier `tint.exe` directement dans ce dossier : `tools/tint/tint.exe`.
 3. Générer le hash d'intégrité :
 

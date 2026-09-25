@@ -62,19 +62,51 @@ catégorie et par sévérité. État après la passe de correction du
   > que si la date de modification ou la taille du fichier a changé depuis la
   > dernière vérification, pour rester bon marché sur un export long.
 
-- [ ] **Flags CLI de `tint.exe` non vérifiés (TODO explicite de l'auteur).**
+- [x] **Flags CLI de `tint.exe` non vérifiés (TODO explicite de l'auteur).**
   `src/Videotoy.Transpiler/WgslTranspilerProcess.cs` (L47-55) contient un TODO
   indiquant que les flags (`--format hlsl -o ...`) n'ont jamais été vérifiés
   contre le binaire réel qui sera distribué. Risque d'échec silencieux ou de
   comportement différent selon la version de `tint.exe` embarquée — à tester
   contre le binaire réellement livré dans `tools/tint/`.
-  > Non vérifiable dans cet environnement (pas de binaire `tint.exe`, pas de
-  > Windows/SDK disponibles pour l'exécuter). L'invocation actuelle
-  > correspond à la CLI documentée du projet Dawn/Tint et n'a donc pas été
-  > changée ; commentaire mis à jour pour expliquer où regarder en premier si
-  > le chargement WGSL échoue systématiquement une fois le binaire en place.
-  > **Reste à faire manuellement** : lancer `tint.exe --help` avec le binaire
-  > réel et confirmer les flags avant la première release avec support WGSL.
+  > Fait — vérifié de bout en bout avec un vrai binaire compilé, pas
+  > seulement par lecture de code source. Le dépôt source complet de
+  > Dawn/Tint a été mis à disposition dans l'environnement (`dawn/`) ;
+  > après avoir initialisé les submodules Git manquants (abseil-cpp,
+  > SPIRV-Headers/Tools, glslang, jinja2/markupsafe, et les en-têtes de
+  > `directx-shader-compiler` pour `dxc/dxcapi.h`), `tint.exe` a été compilé
+  > en Release via CMake+Ninja (MSVC 2022, cible `tint_cmd_tint_cmd`), copié
+  > dans `tools/tint/tint.exe`, et son hash généré
+  > (`tools/tint/generate-hash.ps1`). `tint.exe --help` confirme exactement
+  > l'usage lu dans `main.cc` : `tint [options] <input-file>`, `--format`
+  > (avec `hlsl` disponible), `--output-name`/`-o`. Une conversion WGSL→HLSL
+  > réelle (`tint.exe test.wgsl --format hlsl -o test.hlsl`) a été exécutée
+  > avec l'invocation exacte de `WgslTranspilerProcess.cs` : succès, exit
+  > code 0, HLSL valide généré — confirmant que le TODO d'origine sur les
+  > flags CLI était infondé, l'invocation était déjà correcte.
+  > **Bug distinct découvert et corrigé pendant cette vérification** : la
+  > sortie réelle de Tint pour un point d'entrée `@fragment fn <nom>(...)`
+  > n'est jamais `<type> <nom>(...) : SV_Target` (ce que
+  > `WgslToHlslTranspiler.FragmentEntryPointOutputRegex` cherchait) mais
+  > toujours une paire de structs séparés `<nom>_inputs`/`<nom>_outputs`,
+  > le second portant le champ annoté `SV_Target0` — ex. `struct
+  > mainImage_outputs { float4 tint_symbol : SV_Target0; };` suivi de
+  > `mainImage_outputs mainImage(mainImage_inputs inputs) { ... }`. L'ancien
+  > regex ne matchait donc jamais cette forme réelle, si bien que le
+  > renommage du point d'entrée vers `PSMain` (attendu tel quel par
+  > `MultiPassRenderer`) ne se déclenchait jamais silencieusement — un bug
+  > qui serait resté invisible sans binaire réel pour le révéler. Corrigé en
+  > réécrivant `FragmentEntryPointOutputRegex` pour détecter
+  > `struct <nom>_outputs { ... SV_Target... }` ; le renommage générique par
+  > `\b<nom>\b` déjà en place couvre alors aussi bien la fonction que ses
+  > deux structs associés. **Revérifié en conditions réelles complètes** :
+  > un fichier `.wgsl` de démonstration chargé dans l'application (build
+  > Release), transpilé par le vrai `tint.exe`, compilé par D3DCompiler et
+  > affiché avec succès dans le viewport (dégradé coloré rendu à l'écran,
+  > barre de statut indiquant "Langage : WGSL", ~58 IPS, aucune erreur dans
+  > le panneau Shader Issues) — capture d'écran à l'appui. Le risque
+  > résiduel `TINT_BUILD_HLSL_WRITER=OFF` documenté précédemment ne s'est
+  > pas matérialisé : le binaire compilé localement avec les flags par
+  > défaut de Windows a bien le writer HLSL activé.
 
 - [x] **`iMouse`, `iDate` et `iChannelResolution` toujours à zéro.**
   `src/Videotoy.Rendering/D3D11ShaderRenderer.cs` (L122-138) et
