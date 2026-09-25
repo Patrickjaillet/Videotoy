@@ -1,0 +1,131 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="WGSL" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <Color name="Comment" foreground="#6A9955" />
+  <Color name="String" foreground="#CE9178" />
+  <Color name="Keyword" foreground="#569CD6" fontWeight="bold" />
+  <Color name="Type" foreground="#4EC9B0" />
+  <Color name="Qualifier" foreground="#C586C0" fontWeight="bold" />
+  <Color name="Attribute" foreground="#9B9B9B" />
+  <Color name="BuiltinFunction" foreground="#DCDCAA" />
+  <Color name="Number" foreground="#B5CEA8" />
+
+  <RuleSet>
+    <Span color="Comment" begin="//" />
+    <Span color="Comment" multiline="true" begin="/\*" end="\*/" />
+    <Span color="String">
+      <Begin>"</Begin>
+      <End>"</End>
+    </Span>
+    <Span color="Attribute" begin="@" end="(?=[\s(])" />
+
+    <Keywords color="Qualifier">
+      <Word>var</Word>
+      <Word>let</Word>
+      <Word>const</Word>
+      <Word>uniform</Word>
+      <Word>storage</Word>
+      <Word>read</Word>
+      <Word>write</Word>
+      <Word>read_write</Word>
+      <Word>function</Word>
+      <Word>private</Word>
+      <Word>workgroup</Word>
+    </Keywords>
+
+    <Keywords color="Keyword">
+      <Word>fn</Word>
+      <Word>if</Word>
+      <Word>else</Word>
+      <Word>for</Word>
+      <Word>while</Word>
+      <Word>loop</Word>
+      <Word>break</Word>
+      <Word>continue</Word>
+      <Word>return</Word>
+      <Word>discard</Word>
+      <Word>struct</Word>
+      <Word>true</Word>
+      <Word>false</Word>
+      <Word>switch</Word>
+      <Word>case</Word>
+      <Word>default</Word>
+    </Keywords>
+
+    <Keywords color="Type">
+      <Word>f32</Word>
+      <Word>f16</Word>
+      <Word>i32</Word>
+      <Word>u32</Word>
+      <Word>bool</Word>
+      <Word>vec2f</Word>
+      <Word>vec3f</Word>
+      <Word>vec4f</Word>
+      <Word>vec2i</Word>
+      <Word>vec3i</Word>
+      <Word>vec4i</Word>
+      <Word>vec2u</Word>
+      <Word>vec3u</Word>
+      <Word>vec4u</Word>
+      <Word>vec2</Word>
+      <Word>vec3</Word>
+      <Word>vec4</Word>
+      <Word>mat2x2</Word>
+      <Word>mat3x3</Word>
+      <Word>mat4x4</Word>
+      <Word>texture_2d</Word>
+      <Word>texture_cube</Word>
+      <Word>texture_3d</Word>
+      <Word>sampler</Word>
+    </Keywords>
+
+    <Keywords color="BuiltinFunction">
+      <Word>mainImage</Word>
+      <Word>fragmentMain</Word>
+      <Word>mix</Word>
+      <Word>clamp</Word>
+      <Word>smoothstep</Word>
+      <Word>step</Word>
+      <Word>abs</Word>
+      <Word>sign</Word>
+      <Word>floor</Word>
+      <Word>ceil</Word>
+      <Word>round</Word>
+      <Word>min</Word>
+      <Word>max</Word>
+      <Word>pow</Word>
+      <Word>exp</Word>
+      <Word>log</Word>
+      <Word>exp2</Word>
+      <Word>log2</Word>
+      <Word>sqrt</Word>
+      <Word>inverseSqrt</Word>
+      <Word>sin</Word>
+      <Word>cos</Word>
+      <Word>tan</Word>
+      <Word>asin</Word>
+      <Word>acos</Word>
+      <Word>atan</Word>
+      <Word>length</Word>
+      <Word>distance</Word>
+      <Word>dot</Word>
+      <Word>cross</Word>
+      <Word>normalize</Word>
+      <Word>reflect</Word>
+      <Word>refract</Word>
+      <Word>textureSample</Word>
+      <Word>textureSampleLevel</Word>
+      <Word>textureLoad</Word>
+    </Keywords>
+
+    <Rule color="Number">
+      \b0[xX][0-9a-fA-F]+\b
+      |	\b
+      (	\d+(\.[0-9]+)?
+      |	\.[0-9]+
+      )
+      ([eE][+-]?[0-9]+)?
+      [fFuUiI]?
+      \b
+    </Rule>
+  </RuleSet>
+</SyntaxDefinition>

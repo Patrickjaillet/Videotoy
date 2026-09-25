@@ -19,6 +19,10 @@ external tool or dependency needs to be installed separately.
   `.hlsl`, `.hlsli`) as well as full Shadertoy JSON exports (`.json`,
   `.shadertoy`), including multi-pass projects (`Image`, `Buffer A/B/C/D`,
   `Common`)
+- Plain `.txt` files are also accepted (handy for code copied from
+  shadertoy.com and pasted into a raw text file before importing): since
+  `.txt` carries no language of its own, its source language is always
+  determined by the syntax heuristic below rather than by extension
 - Automatic source-language detection (by extension, then by a syntax
   heuristic for ambiguous files) with a status-bar indicator and a manual
   override if detection ever gets it wrong
@@ -152,8 +156,8 @@ be installed separately. Videotoy requires **Windows 10 version 2004 (build
 ## Usage
 
 1. Launch Videotoy and open a shader (**File → Open Shader...**, or drag a
-   `.glsl` / `.frag` / `.wgsl` / `.hlsl` / `.json` / `.shadertoy` file onto
-   the preview viewport).
+   `.glsl` / `.frag` / `.wgsl` / `.hlsl` / `.json` / `.shadertoy` / `.txt`
+   file onto the preview viewport).
 2. Use the live preview (play/pause, scrub the timeline) to check the
    shader, and adjust any custom uniforms exposed by it.
 3. Open the **Render Settings** panel — organized into collapsible sections
@@ -165,6 +169,109 @@ be installed separately. Videotoy requires **Windows 10 version 2004 (build
    queuing it in the render queue instead, to batch it with other exports.
    Progress, remaining time and cancellation are available while the export
    renders.
+
+## Shadertoy compatibility
+
+Videotoy aims for **binary compatibility** with a shader copied as-is from
+shadertoy.com — no manual adaptation required for the vast majority of
+shaders. This section lists precisely what that covers today, what works with
+a limitation that's deliberate rather than an oversight, and what's out of
+scope entirely, so expectations are clear before importing a shader you
+didn't write yourself.
+
+### Fully supported
+
+- **Standard uniforms**: `iResolution`, `iTime`, `iTimeDelta`, `iFrame`,
+  `iFrameRate`, `iChannelTime[4]`, `iChannel0-3`, `iChannelResolution[4]`,
+  `iSampleRate` (reflecting the actual sample rate of the loaded audio file,
+  not a fixed assumption)
+- **`mainImage` entry point**: the canonical
+  `void mainImage(out vec4 fragColor, in vec2 fragCoord)` signature, tolerant
+  of extra whitespace, an omitted `in` qualifier, and arbitrary parameter
+  names
+- **`iChannel` input types**: static image textures, video files (decoded
+  deterministically by timestamp, with a configurable linear/looped/frozen
+  time-mapping), audio files (WAV/MP3/OGG, spectrum texture regenerated
+  deterministically from `iTime`), inter-pass buffers (Buffer A/B/C/D,
+  including self-referencing/ping-pong feedback), cubemaps, and 3D "Volume"
+  textures
+- **Per-input sampler settings**: `filter` (nearest/linear/mipmap) and `wrap`
+  (clamp/repeat) are honored per `iChannel` rather than one fixed setting for
+  all channels; `vflip` is applied at texture load time
+- **Multi-pass projects**: full Shadertoy JSON exports (`Image`, `Buffer
+  A-D`, `Common`), including real exports from shadertoy.com that link passes
+  by an opaque `id` (`outputs[].id` ↔ `inputs[].id`) rather than by buffer
+  name — falling back to name-based matching only for older or hand-edited
+  exports that lack `id`s
+- **`Common` code**: injected ahead of every other pass's source before
+  transpilation, exactly like Shadertoy's own `#include`-style behavior,
+  including shared functions and structs
+- **GLSL preprocessor**: `#define` (including parameterized macros) and
+  `#ifdef`/`#endif` blocks pass through untouched to the underlying HLSL
+  compiler, which has its own compatible C preprocessor — no special handling
+  needed or applied
+- **GLSL-to-HLSL translation details** that don't map 1:1: scalar-to-vector
+  broadcast constructors (`vec3(0.0)`), matrix-vector multiplication
+  (`mat2 * vec2` correctly becomes `mul(...)`, not HLSL's component-wise
+  `*`), `texelFetch`/`textureLod`, structs, fixed-size arrays, `for` loops
+  with a non-constant bound, and arbitrary user-defined functions (including
+  the noise/hash helpers almost every real Shadertoy shader defines itself)
+- **Arbitrary resolutions and aspect ratios**, not just the built-in 4:3,
+  16:9, and 9:16 presets — `iResolution`/`fragCoord` are computed from the
+  actual render target size with no hidden assumption about a particular
+  ratio
+
+### Supported with a deliberate limitation
+
+These aren't bugs — they follow directly from Videotoy's core design
+guarantee that the exact same shader always renders to the exact same output
+video, regardless of the machine or when the export is run.
+
+- **`iMouse` / `iDate`**: always zero. Both are inherently non-deterministic
+  (real-time mouse interaction, wall-clock date), so making them "real" would
+  break reproducibility — a shader testing `iMouse.z > 0.0` behaves as if the
+  button were never pressed, which is the only reproducible behavior
+  possible.
+- **`Keyboard` input channel**: not supported. It assumes real-time key
+  state, which has no meaning for a deterministic video export. Importing a
+  shader that uses it surfaces a clear warning in the **Shader Issues**
+  panel rather than failing silently; the export renders as if no key was
+  ever pressed.
+- **`Mic` (microphone) audio input**: not supported, for the same reason as
+  `iMouse`/`iDate` — a live audio input can't be reproduced deterministically.
+  Use a music file input instead; importing a shader that uses `Mic` surfaces
+  a clear warning rather than a generic load failure.
+- **Custom uniform sliders**: exported video always uses the shader's
+  declared default values, never whatever was last dragged in the live
+  preview — the export is a function of the shader file alone.
+- **Preview vs. export timing**: the live preview is a real-time,
+  interactive view, not a frame-accurate simulation of the export's
+  timeline — `iFrame` in the preview is computed from the playback position
+  and the selected export frame rate (so it lines up with what the export
+  would compute for that same instant), but `iTime` still advances
+  continuously in the preview against strictly frame-quantized values at
+  export. A shader seeding pseudo-randomness from `iFrame` will therefore
+  look consistent between preview and export at matching timestamps; one
+  seeding from `iTime` may not, since the preview's `iTime` is never exactly
+  frame-quantized the way the export's is. Export-to-export reproducibility
+  (the actual guarantee) is unaffected either way.
+- **`srgb` and `internal` sampler attributes**: read from Shadertoy JSON
+  exports but not yet applied (`filter`/`wrap`/`vflip` are). `srgb` would
+  require per-channel texture format variation on a texture resource that's
+  currently shared across every channel referencing it; `internal` (byte vs.
+  float precision) would require an HDR decoding path the texture loader
+  doesn't have today (8-bit BGRA only).
+- **Cubemap face naming / Volume texture atlas layout**: supported based on a
+  documented, reasoned convention (numbered face suffixes for cubemaps; a
+  horizontal strip of square slices for volume textures), but not yet
+  verified against a real shadertoy.com export of either kind — flagged in
+  code as an assumption to confirm if you run into a mismatch.
+
+### Out of scope
+
+- Live microphone input and real-time keyboard interaction (see above) —
+  fundamentally incompatible with deterministic, reproducible export, not a
+  missing feature.
 
 ## Building from source
 

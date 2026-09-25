@@ -8,6 +8,11 @@ namespace Videotoy.Rendering;
 /// même raison de cycle de dépendances que <see cref="BoundImageAsset"/>.
 /// Doit rester une fonction pure de <paramref name="renderTimeSeconds"/>
 /// pour un appelant donné, pour rester compatible avec le pipeline de
-/// rendu déterministe.
+/// rendu déterministe. <see cref="ResolvePlaybackTimeSeconds"/> expose la
+/// même résolution de mapping temporel (linéaire/bouclé/figé) que
+/// <see cref="GetFramePixelsBgra"/> utilise en interne pour choisir la
+/// frame à décoder, mais comme valeur nue plutôt que des pixels décodés —
+/// c'est exactement la valeur `iChannelTime[n]` attendue par un shader
+/// Shadertoy pour ce canal.
 /// </summary>
-public sealed record BoundVideoAsset(Func<double, int, int, byte[]> GetFramePixelsBgra);
+public sealed record BoundVideoAsset(Func<double, int, int, byte[]> GetFramePixelsBgra, Func<double, double> ResolvePlaybackTimeSeconds);

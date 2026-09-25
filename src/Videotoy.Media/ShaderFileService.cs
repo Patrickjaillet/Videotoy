@@ -14,6 +14,10 @@ public sealed class LoadedShader
 
     public required IReadOnlyDictionary<string, TextureAsset> Textures { get; init; }
 
+    public required IReadOnlyDictionary<string, CubemapAsset> Cubemaps { get; init; }
+
+    public required IReadOnlyDictionary<string, VolumeAsset> Volumes { get; init; }
+
     public required IReadOnlyDictionary<string, AudioTrack> AudioTracks { get; init; }
 
     public required IReadOnlyDictionary<string, Videotoy.Ffmpeg.VideoTextureSource> VideoSources { get; init; }
@@ -26,7 +30,7 @@ public sealed class LoadedShader
 public sealed class ShaderFileService
 {
     private static readonly string[] JsonExtensions = { ".json", ".shadertoy" };
-    private static readonly string[] RawExtensions = { ".glsl", ".frag", ".wgsl", ".hlsl", ".hlsli" };
+    private static readonly string[] RawExtensions = { ".glsl", ".frag", ".wgsl", ".hlsl", ".hlsli", ".txt" };
 
     private readonly TextureLoader _textureLoader;
     private readonly AudioTrackLoader _audioTrackLoader;
@@ -64,7 +68,8 @@ public sealed class ShaderFileService
 
             if (result.IsOk)
             {
-                project = result.ResultValue;
+                project = result.ResultValue.Item1;
+                issues.AddRange(result.ResultValue.Item2);
             }
             else
             {
@@ -105,6 +110,37 @@ public sealed class ShaderFileService
             Project = reloaded.Project,
             Issues = reloaded.Issues,
             Textures = previousLoad.Textures,
+            Cubemaps = previousLoad.Cubemaps,
+            Volumes = previousLoad.Volumes,
+            AudioTracks = previousLoad.AudioTracks,
+            VideoSources = previousLoad.VideoSources,
+            HlslPasses = reloaded.HlslPasses
+        };
+    }
+
+    /// <summary>
+    /// Reconstruit un <see cref="LoadedShader"/> à partir d'un
+    /// <see cref="Videotoy.Core.ShaderModel.ShaderProject"/> déjà en mémoire
+    /// (typiquement <paramref name="previousLoad"/>.Project modifié par
+    /// <see cref="Videotoy.Core.ShaderModel.withPassSourceCode"/> avec le
+    /// contenu actuel de l'éditeur intégré, Phase 1 du ROADMAP) plutôt que
+    /// depuis un fichier sur disque. Réutilise les assets (textures/audio/
+    /// vidéo) déjà chargés par <paramref name="previousLoad"/> — seuls le
+    /// code source et sa validation/transpilation changent lors d'une
+    /// compilation "à la volée" depuis l'éditeur, jamais les channels.
+    /// </summary>
+    public LoadedShader LoadFromProject(Videotoy.Core.ShaderModel.ShaderProject project, LoadedShader previousLoad)
+    {
+        var issues = new List<Videotoy.Core.ShaderModel.ShaderIssue>();
+        var reloaded = BuildLoadedShader(project, issues);
+
+        return new LoadedShader
+        {
+            Project = reloaded.Project,
+            Issues = reloaded.Issues,
+            Textures = previousLoad.Textures,
+            Cubemaps = previousLoad.Cubemaps,
+            Volumes = previousLoad.Volumes,
             AudioTracks = previousLoad.AudioTracks,
             VideoSources = previousLoad.VideoSources,
             HlslPasses = reloaded.HlslPasses
@@ -125,6 +161,8 @@ public sealed class ShaderFileService
 
         var baseDirectory = Path.GetDirectoryName(project.SourceFilePath) ?? string.Empty;
         var textures = new Dictionary<string, TextureAsset>(StringComparer.OrdinalIgnoreCase);
+        var cubemaps = new Dictionary<string, CubemapAsset>(StringComparer.OrdinalIgnoreCase);
+        var volumes = new Dictionary<string, VolumeAsset>(StringComparer.OrdinalIgnoreCase);
         var audioTracks = new Dictionary<string, AudioTrack>(StringComparer.OrdinalIgnoreCase);
         var videoSources = new Dictionary<string, Videotoy.Ffmpeg.VideoTextureSource>(StringComparer.OrdinalIgnoreCase);
 
@@ -135,7 +173,19 @@ public sealed class ShaderFileService
                 var texturePath = Videotoy.Core.ShaderModel.channelTexturePath(channel);
                 if (texturePath is not null && !textures.ContainsKey(texturePath.Value))
                 {
-                    LoadTexture(pass.Name, baseDirectory, texturePath.Value, textures, issues);
+                    LoadTexture(pass.Name, baseDirectory, texturePath.Value, channel.Sampler.VerticalFlip, textures, issues);
+                }
+
+                var cubemapPath = Videotoy.Core.ShaderModel.channelCubemapPath(channel);
+                if (cubemapPath is not null && !cubemaps.ContainsKey(cubemapPath.Value))
+                {
+                    LoadCubemap(pass.Name, baseDirectory, cubemapPath.Value, channel.Sampler.VerticalFlip, cubemaps, issues);
+                }
+
+                var volumePath = Videotoy.Core.ShaderModel.channelVolumePath(channel);
+                if (volumePath is not null && !volumes.ContainsKey(volumePath.Value))
+                {
+                    LoadVolume(pass.Name, baseDirectory, volumePath.Value, channel.Sampler.VerticalFlip, volumes, issues);
                 }
 
                 var audioPath = Videotoy.Core.ShaderModel.channelAudioPath(channel);
@@ -157,6 +207,8 @@ public sealed class ShaderFileService
             Project = project,
             Issues = issues,
             Textures = textures,
+            Cubemaps = cubemaps,
+            Volumes = volumes,
             AudioTracks = audioTracks,
             VideoSources = videoSources,
             HlslPasses = hlslPasses
@@ -167,6 +219,7 @@ public sealed class ShaderFileService
         string passName,
         string baseDirectory,
         string relativeOrAbsolutePath,
+        bool verticalFlip,
         IDictionary<string, TextureAsset> textures,
         ICollection<Videotoy.Core.ShaderModel.ShaderIssue> issues)
     {
@@ -184,11 +237,88 @@ public sealed class ShaderFileService
 
         try
         {
-            textures[relativeOrAbsolutePath] = _textureLoader.Load(resolvedPath);
+            textures[relativeOrAbsolutePath] = _textureLoader.Load(resolvedPath, verticalFlip);
         }
         catch (Exception ex)
         {
             issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Failed to load texture '{relativeOrAbsolutePath}': {ex.Message}"));
+        }
+    }
+
+    /// <summary>
+    /// Charge les 6 faces d'une cubemap (Phase 3 du ROADMAP) : dérive leurs
+    /// 6 chemins depuis <paramref name="relativeOrAbsolutePath"/> (chemin de
+    /// la face 0, tel que déclaré par <c>"src"</c>) via
+    /// <see cref="Videotoy.Core.ShaderModel.cubemapFacePaths"/>, puis valide
+    /// et résout chacun individuellement — même garde-fous que
+    /// <see cref="LoadTexture"/> (traversée de répertoire, fichier
+    /// manquant), appliqués face par face.
+    /// </summary>
+    private void LoadCubemap(
+        string passName,
+        string baseDirectory,
+        string relativeOrAbsolutePath,
+        bool verticalFlip,
+        IDictionary<string, CubemapAsset> cubemaps,
+        ICollection<Videotoy.Core.ShaderModel.ShaderIssue> issues)
+    {
+        var faceRelativePaths = Videotoy.Core.ShaderModel.cubemapFacePaths(relativeOrAbsolutePath);
+        var resolvedFacePaths = new List<string>(faceRelativePaths.Length);
+
+        foreach (var faceRelativePath in faceRelativePaths)
+        {
+            if (!TryResolveAssetPath(baseDirectory, faceRelativePath, out var resolvedFacePath))
+            {
+                issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Cubemap face path escapes the shader's directory: '{faceRelativePath}'."));
+                return;
+            }
+
+            if (!File.Exists(resolvedFacePath))
+            {
+                issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Cubemap face file not found: '{faceRelativePath}'."));
+                return;
+            }
+
+            resolvedFacePaths.Add(resolvedFacePath);
+        }
+
+        try
+        {
+            cubemaps[relativeOrAbsolutePath] = _textureLoader.LoadCubemap(resolvedFacePaths, verticalFlip);
+        }
+        catch (Exception ex)
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Failed to load cubemap '{relativeOrAbsolutePath}': {ex.Message}"));
+        }
+    }
+
+    private void LoadVolume(
+        string passName,
+        string baseDirectory,
+        string relativeOrAbsolutePath,
+        bool verticalFlip,
+        IDictionary<string, VolumeAsset> volumes,
+        ICollection<Videotoy.Core.ShaderModel.ShaderIssue> issues)
+    {
+        if (!TryResolveAssetPath(baseDirectory, relativeOrAbsolutePath, out var resolvedPath))
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Volume texture path escapes the shader's directory: '{relativeOrAbsolutePath}'."));
+            return;
+        }
+
+        if (!File.Exists(resolvedPath))
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Volume texture file not found: '{relativeOrAbsolutePath}'."));
+            return;
+        }
+
+        try
+        {
+            volumes[relativeOrAbsolutePath] = _textureLoader.LoadVolume(resolvedPath, verticalFlip);
+        }
+        catch (Exception ex)
+        {
+            issues.Add(Videotoy.Core.ShaderModel.warningIssue(passName, 1, $"Failed to load volume texture '{relativeOrAbsolutePath}': {ex.Message}"));
         }
     }
 

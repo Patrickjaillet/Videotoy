@@ -37,7 +37,8 @@ let transpilePass (commonCode: string option) (pass: ShaderPass) : TranspileResu
     let customUniformDeclarations =
         Videotoy.Core.CustomUniformParser.parseDeclarations pass.Name rawSource
 
-    let hlslSource = Videotoy.Core.HlslBoilerplate.prependBoilerplate customUniformDeclarations hlslBody
+    let channels = [| pass.Channel0; pass.Channel1; pass.Channel2; pass.Channel3 |]
+    let hlslSource = Videotoy.Core.HlslBoilerplate.prependBoilerplate customUniformDeclarations channels hlslBody
 
     { HlslSource = hlslSource
       EntryPoint = "PSMain"

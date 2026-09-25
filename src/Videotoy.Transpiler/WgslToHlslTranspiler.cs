@@ -59,7 +59,8 @@ public sealed class WgslToHlslTranspiler
         else
         {
             var normalizedBody = NormalizeEntryPoint(result.HlslSource);
-            hlslSource = HlslBoilerplate.prependBoilerplate(customUniformDeclarations, normalizedBody);
+            var channels = new[] { pass.Channel0, pass.Channel1, pass.Channel2, pass.Channel3 };
+            hlslSource = HlslBoilerplate.prependBoilerplate(customUniformDeclarations, channels, normalizedBody);
         }
 
         return new ShaderTranspiler.TranspileResult(

@@ -65,20 +65,76 @@ let shadertoyUniformCBuffer =
     float iTimeDelta;
     int iFrame;
     float iSampleRate;
-    float __padding0;
+    float iFrameRate;
     float4 iMouse;
     float4 iDate;
     float4 iChannelResolution[4];
+    float4 __iChannelTimePacked[4];
 };
+static const float iChannelTime[4] = { __iChannelTimePacked[0].x, __iChannelTimePacked[1].x, __iChannelTimePacked[2].x, __iChannelTimePacked[3].x };
 
 """
 
-let channelDeclarations () : string =
+/// Type de déclaration HLSL d'un `iChannel`, déterminé par le type d'entrée
+/// Shadertoy du canal (`Cubemap`/`Volume` échantillonnent respectivement en
+/// `TextureCube`/`Texture3D`, tout le reste — y compris l'absence de canal —
+/// en `Texture2D`, valeur par défaut historique de ce module). L'appel de
+/// texture (`texture(iChannelN, coord)` → `iChannelN.Sample(...)`) reste
+/// syntaxiquement identique quel que soit le type déclaré ici : seule la
+/// déclaration change, jamais le site d'appel (voir `applyTextureCalls`).
+let private channelHlslTextureType (channel: Videotoy.Core.ShaderModel.ChannelSource option) : string =
+    match channel with
+    | Some { InputType = Videotoy.Core.ShaderModel.Cubemap } -> "TextureCube"
+    | Some { InputType = Videotoy.Core.ShaderModel.Volume } -> "Texture3D"
+    | _ -> "Texture2D"
+
+let channelDeclarations (channels: Videotoy.Core.ShaderModel.ChannelSource option[]) : string =
     [ 0 .. 3 ]
     |> List.map (fun index ->
+        let textureType = channelHlslTextureType (if index < channels.Length then channels.[index] else None)
         sprintf
-            "Texture2D iChannel%d : register(t%d);\nSamplerState iChannel%dSampler : register(s%d);\n"
-            index index index index)
+            "%s iChannel%d : register(t%d);\nSamplerState iChannel%dSampler : register(s%d);\n"
+            textureType index index index index)
+    |> String.concat ""
+
+/// Génère, pour un `iChannel` donné, les fonctions `__texelFetchN`/
+/// `__textureLodN` que `GlslToHlslTranspiler.applyFunctionReplacements`
+/// réécrit `texelFetch(iChannelN, ...)`/`textureLod(iChannelN, ...)` vers
+/// (ex. `texelFetch(iChannel0, p, 0)` → `__texelFetch0(p, 0)`) : HLSL n'a pas
+/// d'équivalent direct pour ces deux built-ins GLSL sous forme d'appel libre
+/// sur l'objet `iChannelN` (`.Load`/`.SampleLevel` sont des méthodes de
+/// l'objet texture, pas des fonctions globales prenant la texture en premier
+/// argument), donc un wrapper par canal est nécessaire pour préserver la
+/// syntaxe d'appel GLSL après réécriture textuelle. `TextureCube` n'a pas de
+/// méthode `.Load` (accès par texel entier, sans filtrage — non défini pour
+/// une cubemap, adressée uniquement par direction) : `__texelFetchN` y est
+/// donc volontairement absent, un shader appelant `texelFetch` sur un canal
+/// cubemap obtient une erreur de compilation HLSL claire (identifiant non
+/// déclaré) plutôt qu'un comportement silencieusement incorrect.
+let private channelHelperFunctions (index: int) (channel: Videotoy.Core.ShaderModel.ChannelSource option) : string =
+    let textureType = channelHlslTextureType channel
+    let sb = StringBuilder()
+
+    let texelFetchSignature =
+        match textureType with
+        | "Texture2D" -> Some(sprintf "float4 __texelFetch%d(int2 p, int lod) { return iChannel%d.Load(int3(p, lod)); }\n" index index)
+        | "Texture3D" -> Some(sprintf "float4 __texelFetch%d(int3 p, int lod) { return iChannel%d.Load(int4(p, lod)); }\n" index index)
+        | _ -> None
+
+    texelFetchSignature |> Option.iter (sb.Append >> ignore)
+
+    let textureLodCoordType = if textureType = "Texture2D" then "float2" else "float3"
+    sb.Append(
+        sprintf
+            "float4 __textureLod%d(%s uv, float lod) { return iChannel%d.SampleLevel(iChannel%dSampler, uv, lod); }\n"
+            index textureLodCoordType index index)
+    |> ignore
+
+    sb.ToString()
+
+let channelHelperFunctionDeclarations (channels: Videotoy.Core.ShaderModel.ChannelSource option[]) : string =
+    [ 0 .. 3 ]
+    |> List.map (fun index -> channelHelperFunctions index (if index < channels.Length then channels.[index] else None))
     |> String.concat ""
 
 let hlslTypeName (uniformType: Videotoy.Core.CustomUniformParser.CustomUniformType) : string =
@@ -111,12 +167,14 @@ let customUniformsCBuffer (declarations: Videotoy.Core.CustomUniformParser.Custo
 /// transpileur pour ne jamais dupliquer cette disposition.
 let prependBoilerplate
     (customUniforms: Videotoy.Core.CustomUniformParser.CustomUniformDeclaration list)
+    (channels: Videotoy.Core.ShaderModel.ChannelSource option[])
     (hlslBody: string)
     : string =
     StringBuilder()
         .Append(shadertoyUniformCBuffer)
         .Append(customUniformsCBuffer customUniforms)
-        .Append(channelDeclarations ())
+        .Append(channelDeclarations channels)
+        .Append(channelHelperFunctionDeclarations channels)
         .Append("\n")
         .Append(hlslBody)
         .ToString()

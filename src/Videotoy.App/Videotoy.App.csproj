@@ -20,6 +20,13 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\Editor\Glsl.xshd" />
+    <Resource Include="Resources\Editor\Hlsl.xshd" />
+    <Resource Include="Resources\Editor\Wgsl.xshd" />
   </ItemGroup>
 
   <ItemGroup>

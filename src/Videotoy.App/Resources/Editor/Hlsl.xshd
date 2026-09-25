@@ -1,0 +1,147 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="HLSL" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <Color name="Comment" foreground="#6A9955" />
+  <Color name="String" foreground="#CE9178" />
+  <Color name="Preprocessor" foreground="#9B9B9B" />
+  <Color name="Keyword" foreground="#569CD6" fontWeight="bold" />
+  <Color name="Type" foreground="#4EC9B0" />
+  <Color name="Qualifier" foreground="#C586C0" fontWeight="bold" />
+  <Color name="BuiltinVariable" foreground="#DCDCAA" />
+  <Color name="BuiltinFunction" foreground="#DCDCAA" />
+  <Color name="Number" foreground="#B5CEA8" />
+
+  <RuleSet>
+    <Span color="Comment" begin="//" />
+    <Span color="Comment" multiline="true" begin="/\*" end="\*/" />
+    <Span color="String">
+      <Begin>"</Begin>
+      <End>"</End>
+    </Span>
+    <Span color="Preprocessor" begin="^\s*#" />
+
+    <Keywords color="Qualifier">
+      <Word>in</Word>
+      <Word>out</Word>
+      <Word>inout</Word>
+      <Word>uniform</Word>
+      <Word>const</Word>
+      <Word>static</Word>
+      <Word>register</Word>
+      <Word>cbuffer</Word>
+      <Word>row_major</Word>
+      <Word>column_major</Word>
+    </Keywords>
+
+    <Keywords color="Keyword">
+      <Word>if</Word>
+      <Word>else</Word>
+      <Word>for</Word>
+      <Word>while</Word>
+      <Word>do</Word>
+      <Word>break</Word>
+      <Word>continue</Word>
+      <Word>return</Word>
+      <Word>discard</Word>
+      <Word>struct</Word>
+      <Word>void</Word>
+      <Word>true</Word>
+      <Word>false</Word>
+      <Word>switch</Word>
+      <Word>case</Word>
+      <Word>default</Word>
+    </Keywords>
+
+    <Keywords color="Type">
+      <Word>float</Word>
+      <Word>double</Word>
+      <Word>int</Word>
+      <Word>uint</Word>
+      <Word>bool</Word>
+      <Word>float2</Word>
+      <Word>float3</Word>
+      <Word>float4</Word>
+      <Word>int2</Word>
+      <Word>int3</Word>
+      <Word>int4</Word>
+      <Word>uint2</Word>
+      <Word>uint3</Word>
+      <Word>uint4</Word>
+      <Word>bool2</Word>
+      <Word>bool3</Word>
+      <Word>bool4</Word>
+      <Word>float2x2</Word>
+      <Word>float3x3</Word>
+      <Word>float4x4</Word>
+      <Word>Texture2D</Word>
+      <Word>TextureCube</Word>
+      <Word>Texture3D</Word>
+      <Word>SamplerState</Word>
+    </Keywords>
+
+    <Keywords color="BuiltinVariable">
+      <Word>SV_Target</Word>
+      <Word>SV_Position</Word>
+      <Word>iResolution</Word>
+      <Word>iTime</Word>
+      <Word>iTimeDelta</Word>
+      <Word>iFrame</Word>
+      <Word>iFrameRate</Word>
+      <Word>iChannelTime</Word>
+      <Word>iChannelResolution</Word>
+      <Word>iMouse</Word>
+      <Word>iDate</Word>
+      <Word>iSampleRate</Word>
+    </Keywords>
+
+    <Keywords color="BuiltinFunction">
+      <Word>mainImage</Word>
+      <Word>fmod</Word>
+      <Word>frac</Word>
+      <Word>lerp</Word>
+      <Word>clamp</Word>
+      <Word>smoothstep</Word>
+      <Word>step</Word>
+      <Word>abs</Word>
+      <Word>sign</Word>
+      <Word>floor</Word>
+      <Word>ceil</Word>
+      <Word>round</Word>
+      <Word>min</Word>
+      <Word>max</Word>
+      <Word>pow</Word>
+      <Word>exp</Word>
+      <Word>log</Word>
+      <Word>exp2</Word>
+      <Word>log2</Word>
+      <Word>sqrt</Word>
+      <Word>rsqrt</Word>
+      <Word>sin</Word>
+      <Word>cos</Word>
+      <Word>tan</Word>
+      <Word>asin</Word>
+      <Word>acos</Word>
+      <Word>atan</Word>
+      <Word>length</Word>
+      <Word>distance</Word>
+      <Word>dot</Word>
+      <Word>cross</Word>
+      <Word>normalize</Word>
+      <Word>reflect</Word>
+      <Word>refract</Word>
+      <Word>Sample</Word>
+      <Word>SampleLevel</Word>
+      <Word>Load</Word>
+    </Keywords>
+
+    <Rule color="Number">
+      \b0[xX][0-9a-fA-F]+\b
+      |	\b
+      (	\d+(\.[0-9]+)?
+      |	\.[0-9]+
+      )
+      ([eE][+-]?[0-9]+)?
+      [fFuUlL]?
+      \b
+    </Rule>
+  </RuleSet>
+</SyntaxDefinition>

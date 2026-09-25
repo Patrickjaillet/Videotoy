@@ -224,14 +224,16 @@ public sealed class RenderQueueProcessor
                 return null;
             }
 
-            var (images, audioTracks, videoSources) = _boundAssetsBuilder.Build(loadedShader);
+            var (images, cubemaps, volumes, audioTracks, videoSources) = _boundAssetsBuilder.Build(loadedShader);
             _exportRenderer.Initialize(
                 RenderTargetSize.PreviewDefault,
                 loadedShader.Project,
                 loadedShader.HlslPasses,
                 images,
                 audioTracks,
-                videoSources);
+                videoSources,
+                cubemaps,
+                volumes);
 
             var pixels = _exportRenderer.RenderFrame(0.0, 0.0, 0);
             return MainWindowViewModel.CreatePreviewBitmap(pixels);
@@ -250,7 +252,7 @@ public sealed class RenderQueueProcessor
             throw new InvalidOperationException($"Shader '{item.ShaderDisplayName}' has validation errors.");
         }
 
-        var (images, audioTracks, videoSources) = _boundAssetsBuilder.Build(loadedShader);
+        var (images, cubemaps, volumes, audioTracks, videoSources) = _boundAssetsBuilder.Build(loadedShader);
 
         var progress = new Progress<VideoExportProgress>(p =>
             ItemProgressChanged?.Invoke(this, new RenderQueueItemProgressEventArgs(item.Id, itemIndex, totalItems, p)));
@@ -265,7 +267,9 @@ public sealed class RenderQueueProcessor
                 loadedShader.HlslPasses,
                 images,
                 audioTracks,
-                videoSources);
+                videoSources,
+                cubemaps,
+                volumes);
 
             var audioSourceFilePath = item.IncludeAudioInExport
                 ? BoundAssetsBuilder.ResolveExportAudioSourceFilePath(loadedShader)
@@ -283,7 +287,9 @@ public sealed class RenderQueueProcessor
                 loadedShader.HlslPasses,
                 images,
                 audioTracks,
-                videoSources);
+                videoSources,
+                cubemaps,
+                volumes);
 
             await _animatedImageExportPipeline.RunAsync(exportSettings, progress, cancellationToken);
         }
@@ -297,7 +303,9 @@ public sealed class RenderQueueProcessor
                 loadedShader.HlslPasses,
                 images,
                 audioTracks,
-                videoSources);
+                videoSources,
+                cubemaps,
+                volumes);
 
             var imageSequenceProgress = new Progress<ImageSequenceExportProgress>(p =>
                 ItemProgressChanged?.Invoke(this, new RenderQueueItemProgressEventArgs(

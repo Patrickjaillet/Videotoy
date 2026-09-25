@@ -33,6 +33,36 @@ public partial class MainWindow : Window
         var shaderIssuesView = shaderIssuesViewSource.View;
         shaderIssuesView.Filter = OnShaderIssuesFilter;
         _viewModel.ShaderIssuesFilterChanged += (_, _) => shaderIssuesView.Refresh();
+
+        _viewModel.PropertyChanged += OnViewModelPropertyChangedForEditorPanel;
+    }
+
+    /// <summary>
+    /// Largeur du panneau éditeur une fois ouvert (Phase 1 du ROADMAP).
+    /// </summary>
+    private const double EditorPanelOpenWidth = 420;
+
+    /// <summary>
+    /// Ajuste <see cref="EditorPanelColumn"/> à chaque bascule de
+    /// <see cref="MainWindowViewModel.IsEditorPanelOpen"/> — affectation
+    /// directe de <c>Width</c> plutôt qu'un <c>Storyboard</c> comme
+    /// <see cref="OnTogglePanelClicked"/> pour <c>SettingsPanelColumn</c> :
+    /// <c>ColumnDefinition.Width</c> est de type <c>GridLength</c>, qu'une
+    /// <c>DoubleAnimation</c> ne peut pas animer (lève
+    /// <c>InvalidOperationException</c> à l'exécution — confirmé en testant
+    /// cette implémentation). Réagit à un changement de propriété plutôt
+    /// qu'à un <c>Click</c> direct puisque le bouton de bascule de ce
+    /// panneau est un <c>RelayCommand</c> bindé déclarativement (barre
+    /// d'outils ET menu Fichier y pointent tous les deux).
+    /// </summary>
+    private void OnViewModelPropertyChangedForEditorPanel(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainWindowViewModel.IsEditorPanelOpen))
+        {
+            return;
+        }
+
+        EditorPanelColumn.Width = new GridLength(_viewModel.IsEditorPanelOpen ? EditorPanelOpenWidth : 0);
     }
 
     /// <summary>

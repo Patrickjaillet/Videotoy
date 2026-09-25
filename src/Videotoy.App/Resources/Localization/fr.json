@@ -4,6 +4,9 @@
 
   "menu.file": "Fichier",
   "menu.file.openShader": "Ouvrir un shader...",
+  "menu.file.newShader": "Nouveau shader",
+  "menu.file.save": "Enregistrer",
+  "menu.file.saveAs": "Enregistrer sous...",
   "menu.file.recentShaders": "Shaders récents",
   "menu.file.recentShaders.empty": "Aucun shader récent",
   "menu.file.exit": "Quitter",
@@ -39,6 +42,12 @@
   "issues.filter.errors": "Erreurs",
   "issues.filter.warnings": "Avertissements",
   "issues.panel.line": "Ligne {0}",
+
+  "editor.panel.title": "Éditeur de code",
+  "editor.panel.close": "Fermer",
+  "editor.unsavedIndicator": "Modifications non enregistrées",
+  "editor.compile": "Compiler",
+  "editor.compile.tooltip": "Compiler et prévisualiser le contenu actuel de l'éditeur (Ctrl+Entrée)",
 
   "panel.renderSettings": "Paramètres de rendu",
   "panel.history.undo": "Annuler",

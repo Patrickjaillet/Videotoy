@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-25
+
+### Added
+
+- Integrated code editor panel (side-by-side with the live preview) with
+  GLSL/HLSL/WGSL syntax highlighting, per-pass tabs for multi-pass projects
+  (Image/Buffer A-D/Common), New/Save/Save As, an unsaved-changes indicator,
+  and on-the-fly compile-and-preview (`Ctrl+Enter`) without touching the
+  file on disk until explicitly saved
+- `.txt` files are now accepted as shader source (detected by syntax
+  heuristic rather than extension), for code copied from shadertoy.com and
+  pasted into a plain text file before importing
+- `iChannelTime[4]` and `iFrameRate` uniforms
+- `cubemap` and `volume` (3D texture) `iChannel` input types, with 6-face
+  cubemap loading and volume-atlas slicing
+- Per-input sampler settings from Shadertoy JSON exports (`filter`, `wrap`)
+  now applied per channel instead of one fixed setting for every `iChannel`;
+  `vflip` applied at texture load time
+- Clear Shader Issues warnings (instead of a silent dropped channel or an
+  opaque failure) for a shader using an unsupported-by-design `iChannel`
+  type (`Keyboard`, `Mic`) or any channel type not recognized at all
+- A "Shadertoy compatibility" section in the README documenting exactly
+  what's fully supported, what's supported with a deliberate
+  determinism-driven limitation, and what's out of scope
+
+### Fixed
+
+- Inter-pass buffer links in a real shadertoy.com JSON export were resolved
+  by the input's `src` thumbnail path instead of the opaque `id` that
+  actually links `outputs[]` to `inputs[]`, so a genuine Shadertoy export
+  could fail to find its own buffer
+- `texelFetch`/`textureLod` were rewritten to HLSL identifiers that were
+  never actually declared anywhere, so any shader using either failed to
+  compile
+- `mat2`/`mat3`/`mat4` multiplied by a vector translated to HLSL's `*`
+  operator, which is component-wise rather than a real matrix
+  multiplication, producing a compile error or a wrong result instead of
+  the intended transform
+- A scalar-broadcast vector constructor (`vec3(x)`) nested inside another
+  multi-argument constructor was never expanded, causing an
+  "incorrect number of arguments" compile error
+- `iSampleRate` always reported a fixed 44100 Hz instead of the loaded audio
+  file's actual sample rate
+- The live preview's `iFrame` advanced once per real display refresh instead
+  of tracking the selected export frame rate, so a shader seeding
+  pseudo-randomness from `iFrame` could look inconsistent between preview
+  and export
+
 ## [2.2.3] - 2026-09-24
 
 ### Changed

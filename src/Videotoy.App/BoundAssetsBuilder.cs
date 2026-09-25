@@ -34,6 +34,8 @@ public sealed class BoundAssetsBuilder
 
     public (
         IReadOnlyDictionary<string, BoundImageAsset> Images,
+        IReadOnlyDictionary<string, BoundCubemapAsset> Cubemaps,
+        IReadOnlyDictionary<string, BoundVolumeAsset> Volumes,
         IReadOnlyDictionary<string, BoundAudioAsset> AudioTracks,
         IReadOnlyDictionary<string, BoundVideoAsset> VideoSources)
         Build(LoadedShader loadedShader)
@@ -42,12 +44,22 @@ public sealed class BoundAssetsBuilder
             pair => pair.Key,
             pair => new BoundImageAsset(pair.Value.Width, pair.Value.Height, pair.Value.PixelDataBgra));
 
+        var cubemaps = loadedShader.Cubemaps.ToDictionary(
+            pair => pair.Key,
+            pair => new BoundCubemapAsset(pair.Value.FaceWidth, pair.Value.FaceHeight, pair.Value.FacesBgra));
+
+        var volumes = loadedShader.Volumes.ToDictionary(
+            pair => pair.Key,
+            pair => new BoundVolumeAsset(pair.Value.SliceWidth, pair.Value.SliceHeight, pair.Value.SliceCount, pair.Value.SlicesBgra));
+
         var audioTracks = loadedShader.AudioTracks.ToDictionary(
             pair => pair.Key,
             pair =>
             {
                 var track = pair.Value;
-                return new BoundAudioAsset(timeSeconds => _audioSpectrumTextureGenerator.Generate(track, timeSeconds).PixelDataBgra);
+                return new BoundAudioAsset(
+                    timeSeconds => _audioSpectrumTextureGenerator.Generate(track, timeSeconds).PixelDataBgra,
+                    track.SampleRate);
             });
 
         var videoSources = loadedShader.VideoSources.ToDictionary(
@@ -55,19 +67,24 @@ public sealed class BoundAssetsBuilder
             pair =>
             {
                 var source = pair.Value;
-                return new BoundVideoAsset((renderTimeSeconds, targetWidth, targetHeight) =>
-                {
-                    var playbackTimeSeconds = Videotoy.Core.VideoTimeMapping.resolveVideoPlaybackTimeSeconds(
+                double ResolvePlaybackTimeSeconds(double renderTimeSeconds) =>
+                    Videotoy.Core.VideoTimeMapping.resolveVideoPlaybackTimeSeconds(
                         source.TimeMapping, source.Probe.DurationSeconds, renderTimeSeconds);
 
-                    return _videoTextureLoader
-                        .GetFramePixelsBgraAsync(source.FilePath, playbackTimeSeconds, targetWidth, targetHeight)
-                        .GetAwaiter()
-                        .GetResult();
-                });
+                return new BoundVideoAsset(
+                    (renderTimeSeconds, targetWidth, targetHeight) =>
+                    {
+                        var playbackTimeSeconds = ResolvePlaybackTimeSeconds(renderTimeSeconds);
+
+                        return _videoTextureLoader
+                            .GetFramePixelsBgraAsync(source.FilePath, playbackTimeSeconds, targetWidth, targetHeight)
+                            .GetAwaiter()
+                            .GetResult();
+                    },
+                    ResolvePlaybackTimeSeconds);
             });
 
-        return (images, audioTracks, videoSources);
+        return (images, cubemaps, volumes, audioTracks, videoSources);
     }
 
     /// <summary>

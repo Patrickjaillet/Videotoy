@@ -21,7 +21,7 @@ namespace Videotoy.App.ViewModels;
 public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 {
     private static readonly string[] OpenFileDialogExtensions =
-        { "*.glsl", "*.frag", "*.wgsl", "*.hlsl", "*.hlsli", "*.json", "*.shadertoy" };
+        { "*.glsl", "*.frag", "*.wgsl", "*.hlsl", "*.hlsli", "*.json", "*.shadertoy", "*.txt" };
 
     private readonly ShaderFileService _shaderFileService;
     private readonly RecentFilesService _recentFilesService;
@@ -234,6 +234,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private bool _isRenderQueuePanelOpen;
+
+    /// <summary>
+    /// Panneau éditeur de code intégré (Phase 1 du ROADMAP) — une colonne
+    /// supplémentaire affichée à côté du viewport, jamais à sa place, pour
+    /// que le code et l'aperçu restent visibles simultanément. Le reste de
+    /// l'état de l'éditeur (texte, onglet de passe sélectionné, état
+    /// modifié/non-sauvegardé) est déclaré dans
+    /// <c>MainWindowViewModel.Editor.cs</c>.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isEditorPanelOpen;
 
     [ObservableProperty]
     private string _loadedShaderName = string.Empty;
@@ -2052,14 +2063,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         try
         {
-            var (images, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
+            var (images, cubemaps, volumes, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
             _exportRenderer.Initialize(
                 new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height),
                 _loadedShader.Project,
                 _loadedShader.HlslPasses,
                 images,
                 audioTracks,
-                videoSources);
+                videoSources,
+                cubemaps,
+                volumes);
 
             await _exportPipeline.RunAsync(
                 exportSettings,
@@ -2220,14 +2233,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         try
         {
-            var (images, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
+            var (images, cubemaps, volumes, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
             _exportRenderer.Initialize(
                 new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height),
                 _loadedShader.Project,
                 _loadedShader.HlslPasses,
                 images,
                 audioTracks,
-                videoSources);
+                videoSources,
+                cubemaps,
+                volumes);
 
             await _animatedImageExportPipeline.RunAsync(exportSettings, progress, _exportCancellationTokenSource.Token);
 
@@ -2452,14 +2467,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         try
         {
-            var (images, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
+            var (images, cubemaps, volumes, audioTracks, videoSources) = BuildBoundAssets(_loadedShader);
             _exportRenderer.Initialize(
                 new RenderTargetSize(exportSettings.Resolution.Width, exportSettings.Resolution.Height),
                 _loadedShader.Project,
                 _loadedShader.HlslPasses,
                 images,
                 audioTracks,
-                videoSources);
+                videoSources,
+                cubemaps,
+                volumes);
 
             await _imageSequenceExportPipeline.RunAsync(
                 exportSettings, progress, _exportCancellationTokenSource.Token,
@@ -2841,6 +2858,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             _recentFilesService.AddOrPromote(filePath);
             ReloadRecentShaders();
 
+            PopulateEditorFromProject(loadedShader.Project);
+
             if (!loadedShader.HasErrors)
             {
                 InitializePreview(loadedShader);
@@ -3006,10 +3025,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Convertit <see cref="LoadedShader.Textures"/>/<c>.AudioTracks</c>/
-    /// <c>.VideoSources</c> vers les types neutres attendus par
-    /// <see cref="MultiPassRenderer.Initialize"/>
-    /// (<see cref="BoundImageAsset"/>/<see cref="BoundAudioAsset"/>/
+    /// Convertit <see cref="LoadedShader.Textures"/>/<c>.Cubemaps</c>/
+    /// <c>.Volumes</c>/<c>.AudioTracks</c>/<c>.VideoSources</c> vers les
+    /// types neutres attendus par <see cref="MultiPassRenderer.Initialize"/>
+    /// (<see cref="BoundImageAsset"/>/<see cref="BoundCubemapAsset"/>/
+    /// <see cref="BoundVolumeAsset"/>/<see cref="BoundAudioAsset"/>/
     /// <see cref="BoundVideoAsset"/>) — cette conversion existe uniquement
     /// pour que <c>Videotoy.Rendering</c> n'ait jamais besoin de référencer
     /// <c>Videotoy.Media</c>/<c>Videotoy.Ffmpeg</c> (cycle de dépendances,
@@ -3017,6 +3037,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     private (
         IReadOnlyDictionary<string, BoundImageAsset> Images,
+        IReadOnlyDictionary<string, BoundCubemapAsset> Cubemaps,
+        IReadOnlyDictionary<string, BoundVolumeAsset> Volumes,
         IReadOnlyDictionary<string, BoundAudioAsset> AudioTracks,
         IReadOnlyDictionary<string, BoundVideoAsset> VideoSources)
         BuildBoundAssets(LoadedShader loadedShader) => _boundAssetsBuilder.Build(loadedShader);
@@ -3025,8 +3047,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _loadedShader = loadedShader;
 
-        var (images, audioTracks, videoSources) = BuildBoundAssets(loadedShader);
-        _previewRenderer.Initialize(RenderTargetSize.PreviewDefault, loadedShader.Project, loadedShader.HlslPasses, images, audioTracks, videoSources);
+        var (images, cubemaps, volumes, audioTracks, videoSources) = BuildBoundAssets(loadedShader);
+        _previewRenderer.Initialize(RenderTargetSize.PreviewDefault, loadedShader.Project, loadedShader.HlslPasses, images, audioTracks, videoSources, cubemaps, volumes);
         ReloadCustomUniformGroups();
         ReloadVideoChannels(loadedShader);
 
@@ -3077,7 +3099,24 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var pixels = _previewRenderer.RenderFrame(_previewClock.CurrentTimeSeconds, 0.0, CurrentFrame);
+        // iFrame dérivé du temps de lecture et du frame rate d'export cible
+        // (Phase 5 du ROADMAP, item "alignement des seeds pseudo-aléatoires
+        // preview/export") plutôt qu'un compteur incrémenté une fois par
+        // tick d'affichage réel : la preview tourne à un taux de
+        // rafraîchissement réel indépendant (~60 Hz, variable selon la
+        // machine), donc un compteur par tick dérivait de plus en plus de la
+        // numérotation de frame que l'export calculerait pour ce même
+        // instant. Un shader qui dérive un état pseudo-aléatoire de `iFrame`
+        // (motif courant sur Shadertoy) voit ainsi le même `iFrame` en
+        // preview et à l'export pour un même instant de lecture, même si le
+        // rythme d'affichage réel de la preview reste indépendant. Reste une
+        // approximation, pas une garantie stricte d'égalité frame-à-frame :
+        // la preview n'est pas un rejeu de la timeline déterministe de
+        // l'export (`Core.LoopCalculator`), seul l'export garantit un
+        // résultat reproductible d'un run à l'autre.
+        var previewFrameIndex = (int)(_previewClock.CurrentTimeSeconds * ResolveExportFrameRate().Value);
+
+        var pixels = _previewRenderer.RenderFrame(_previewClock.CurrentTimeSeconds, 0.0, previewFrameIndex);
         if (pixels.Length == 0)
         {
             return;
@@ -3089,7 +3128,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             _previewBitmap.PixelWidth * 4,
             0);
 
-        CurrentFrame++;
+        CurrentFrame = previewFrameIndex;
     }
 
     private void ReloadRecentShaders()
