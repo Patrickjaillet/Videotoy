@@ -27,6 +27,14 @@
     <Geometry x:Key="IconSave">M4,4 L16,4 L20,8 L20,20 L4,20 Z M7,4 L7,9 L15,9 L15,4 M7,20 L7,14 L17,14 L17,20</Geometry>
     <Geometry x:Key="IconSaveAs">M4,4 L14,4 L18,8 L18,20 L4,20 Z M7,4 L7,9 L13,9 L13,4 M7,20 L7,14 L15,14 L15,20 M18.5,15.5 L22.5,15.5 M20.5,13.5 L20.5,17.5</Geometry>
 
+    <!--
+        Style d'icône neutre (Phase 7 du ROADMAP : garde le contour gris
+        d'origine) — utilisé pour les icônes de chrome de fenêtre
+        (minimiser/agrandir/fermer) et tout endroit sans contexte de couleur
+        propre. Les icônes porteuses de sens (édition/export/file de rendu/
+        historique/danger) utilisent désormais l'un des styles colorés
+        ci-dessous à la place.
+    -->
     <Style x:Key="VectorIconStyle" TargetType="Path">
         <Setter Property="Stretch" Value="Uniform" />
         <Setter Property="Stroke" Value="{StaticResource TextPrimaryBrush}" />
@@ -36,6 +44,42 @@
         <Setter Property="StrokeLineJoin" Value="Round" />
         <Setter Property="Width" Value="16" />
         <Setter Property="Height" Value="16" />
+    </Style>
+
+    <!--
+        Icônes colorées par contexte (Phase 7) : même géométrie/contour que
+        VectorIconStyle, mais teintées par l'accent du domaine fonctionnel
+        auquel l'icône appartient (édition = violet, export = bleu-cyan,
+        file de rendu = orange, historique = turquoise, danger = rose) —
+        voir Palette.xaml pour les *AccentBrush/*GradientBrush correspondants.
+        Le contour (Stroke) reste la source de vérité visuelle pour ne pas
+        perdre la netteté des géométries dessinées en traits fins ; un Fill
+        en dégradé de la même teinte est ajouté par-dessus pour les sous-
+        chemins fermés des géométries (cercles/rectangles comme IconClock/
+        IconRenderQueue/IconError), ce qui leur donne un vrai remplissage
+        "SVG coloré" — WPF ignore silencieusement Fill sur les géométries
+        entièrement en traits ouverts (IconUndo, IconExport, etc.), qui
+        restent donc du contour pur sans régression visuelle.
+    -->
+    <Style x:Key="EditIconStyle" TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
+        <Setter Property="Stroke" Value="{StaticResource EditAccentBrush}" />
+        <Setter Property="Fill" Value="{StaticResource AccentGradientBrush}" />
+    </Style>
+    <Style x:Key="ExportIconStyle" TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
+        <Setter Property="Stroke" Value="{StaticResource ExportAccentBrush}" />
+        <Setter Property="Fill" Value="{StaticResource ExportGradientBrush}" />
+    </Style>
+    <Style x:Key="QueueIconStyle" TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
+        <Setter Property="Stroke" Value="{StaticResource QueueAccentBrush}" />
+        <Setter Property="Fill" Value="{StaticResource QueueGradientBrush}" />
+    </Style>
+    <Style x:Key="HistoryIconStyle" TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
+        <Setter Property="Stroke" Value="{StaticResource HistoryAccentBrush}" />
+        <Setter Property="Fill" Value="{StaticResource HistoryGradientBrush}" />
+    </Style>
+    <Style x:Key="DangerIconStyle" TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
+        <Setter Property="Stroke" Value="{StaticResource DangerAccentBrush}" />
+        <Setter Property="Fill" Value="{StaticResource DangerGradientBrush}" />
     </Style>
 
 </ResourceDictionary>

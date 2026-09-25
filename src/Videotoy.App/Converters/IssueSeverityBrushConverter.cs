@@ -6,8 +6,8 @@ namespace Videotoy.App.Converters;
 
 public sealed class IssueSeverityBrushConverter : IValueConverter
 {
-    private static readonly SolidColorBrush ErrorBrush = new(Color.FromRgb(0xD8, 0x48, 0x3C));
-    private static readonly SolidColorBrush WarningBrush = new(Color.FromRgb(0xC8, 0x8A, 0x2E));
+    private static readonly SolidColorBrush ErrorBrush = new(Color.FromRgb(0xF0, 0x39, 0x7C));
+    private static readonly SolidColorBrush WarningBrush = new(Color.FromRgb(0xFF, 0x93, 0x30));
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {

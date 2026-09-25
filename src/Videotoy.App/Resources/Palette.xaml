@@ -1,16 +1,88 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <SolidColorBrush x:Key="BackgroundBrush" Color="#FFF5F6F8" />
+    <!--
+        Palette "vitamine" (Phase 7 du ROADMAP) : base toujours claire, mais
+        plusieurs accents saturés utilisés par contexte plutôt qu'un unique
+        bleu partout — cohérent avec les convertisseurs de sévérité déjà en
+        place (IssueSeverityBrushConverter/ToastSeverityBrushConverter) qui
+        distinguaient déjà erreur/avertissement par la couleur ; on étend ce
+        principe à l'édition, l'export vidéo, la file de rendu et l'historique.
+        AccentBrush reste la couleur "par défaut"/rétrocompatible utilisée par
+        les styles qui n'ont pas encore de contexte propre.
+    -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="#FFF7F5FB" />
     <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFFFF" />
-    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#FFEFF1F4" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#FF2F6FE4" />
-    <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF1E5BD1" />
-    <SolidColorBrush x:Key="AccentPressedBrush" Color="#FF17469E" />
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF1B1D1F" />
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF6B7075" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#FFE0E2E6" />
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#FFF1EEFA" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF6C4FF2" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF5B3EE0" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#FF4A2FC4" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF201B33" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF75708F" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#FFE6E1F5" />
     <SolidColorBrush x:Key="ViewportBackgroundBrush" Color="#FF0C0C0E" />
+
+    <!-- Accents contextuels : édition (violet), export vidéo (bleu-cyan),
+         file de rendu (orange), historique (turquoise), erreurs (rose vif) —
+         voir Icons.xaml pour leur usage par icône, et IssueSeverityBrushConverter
+         /ToastSeverityBrushConverter (Converters/) pour erreur/avertissement. -->
+    <SolidColorBrush x:Key="EditAccentBrush" Color="#FF6C4FF2" />
+    <SolidColorBrush x:Key="EditAccentHoverBrush" Color="#FF5B3EE0" />
+    <SolidColorBrush x:Key="ExportAccentBrush" Color="#FF1FA9E8" />
+    <SolidColorBrush x:Key="ExportAccentHoverBrush" Color="#FF0F8FCB" />
+    <SolidColorBrush x:Key="QueueAccentBrush" Color="#FFFF9330" />
+    <SolidColorBrush x:Key="QueueAccentHoverBrush" Color="#FFE87D19" />
+    <SolidColorBrush x:Key="HistoryAccentBrush" Color="#FF13C7A0" />
+    <SolidColorBrush x:Key="HistoryAccentHoverBrush" Color="#FF0DA986" />
+    <SolidColorBrush x:Key="DangerAccentBrush" Color="#FFF0397C" />
+    <SolidColorBrush x:Key="DangerAccentHoverBrush" Color="#FFD41D60" />
+
+    <!-- Dégradés diagonaux des accents ci-dessus, pour boutons/icônes actifs
+         et surfaces mises en avant (Phase 7) — dérivés de la même teinte que
+         leur SolidColorBrush pour rester reconnaissables comme "la même
+         couleur", jamais une teinte arbitraire supplémentaire. -->
+    <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FF8A70FF" Offset="0" />
+        <GradientStop Color="#FF6C4FF2" Offset="0.55" />
+        <GradientStop Color="#FF4A2FC4" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="ExportGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FF57D2FF" Offset="0" />
+        <GradientStop Color="#FF1FA9E8" Offset="0.55" />
+        <GradientStop Color="#FF0F7FB8" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="QueueGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFFFB868" Offset="0" />
+        <GradientStop Color="#FFFF9330" Offset="0.55" />
+        <GradientStop Color="#FFDB6E10" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="HistoryGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FF52E8C8" Offset="0" />
+        <GradientStop Color="#FF13C7A0" Offset="0.55" />
+        <GradientStop Color="#FF0A9679" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="DangerGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFFF6FA3" Offset="0" />
+        <GradientStop Color="#FFF0397C" Offset="0.55" />
+        <GradientStop Color="#FFC01158" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Fond de fenêtre "vitamine" : dégradé multi-teintes très doux (pas un
+         aplat) ; WindowBackgroundTextureBrush (grain PNG tuilé, faible
+         opacité) vient s'ajouter par-dessus dans MainWindow.xaml pour casser
+         la planéité du dégradé sans devenir un motif visible en soi. -->
+    <LinearGradientBrush x:Key="WindowBackgroundGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFF7F5FB" Offset="0" />
+        <GradientStop Color="#FFF1EEFC" Offset="0.5" />
+        <GradientStop Color="#FFEDF3FC" Offset="1" />
+    </LinearGradientBrush>
+
+    <ImageBrush x:Key="WindowBackgroundTextureBrush"
+                ImageSource="pack://application:,,,/Assets/Backgrounds/window-grain.png"
+                TileMode="Tile"
+                Viewport="0,0,128,128"
+                ViewportUnits="Absolute"
+                Stretch="Fill" />
 
     <!--
         Transparent checkerboard tile for the preview viewport background
@@ -41,24 +113,51 @@
             </DrawingGroup>
         </DrawingBrush.Drawing>
     </DrawingBrush>
-    <SolidColorBrush x:Key="DangerBrush" Color="#FFD8483C" />
-    <SolidColorBrush x:Key="SuccessBrush" Color="#FF2FA765" />
+    <!-- Unifié sur DangerAccentBrush (Phase 7) : gardait auparavant un rouge-
+         brique distinct de la nouvelle teinte rose des erreurs, deux "rouges"
+         différents dans la même UI n'ayant plus de raison d'être. -->
+    <SolidColorBrush x:Key="DangerBrush" Color="#FFF0397C" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#FF13C7A0" />
 
     <DropShadowEffect x:Key="CardShadow"
-                      Color="#FF1B1D1F"
+                      Color="#FF3A2E66"
                       Opacity="0.10"
                       BlurRadius="18"
                       ShadowDepth="3"
                       Direction="270" />
 
     <DropShadowEffect x:Key="AccentGlow"
-                      Color="#FF2F6FE4"
+                      Color="#FF6C4FF2"
+                      Opacity="0.55"
+                      BlurRadius="16"
+                      ShadowDepth="0" />
+
+    <!-- Glows par contexte (Phase 7) — même usage qu'AccentGlow (survol/état
+         actif d'un bouton icône ou chip), teinté par accent contextuel plutôt
+         que toujours l'accent violet par défaut. -->
+    <DropShadowEffect x:Key="ExportGlow"
+                      Color="#FF1FA9E8"
+                      Opacity="0.55"
+                      BlurRadius="16"
+                      ShadowDepth="0" />
+    <DropShadowEffect x:Key="QueueGlow"
+                      Color="#FFFF9330"
+                      Opacity="0.55"
+                      BlurRadius="16"
+                      ShadowDepth="0" />
+    <DropShadowEffect x:Key="HistoryGlow"
+                      Color="#FF13C7A0"
+                      Opacity="0.55"
+                      BlurRadius="16"
+                      ShadowDepth="0" />
+    <DropShadowEffect x:Key="DangerGlow"
+                      Color="#FFF0397C"
                       Opacity="0.55"
                       BlurRadius="16"
                       ShadowDepth="0" />
 
     <DropShadowEffect x:Key="PopupShadow"
-                      Color="#FF1B1D1F"
+                      Color="#FF3A2E66"
                       Opacity="0.18"
                       BlurRadius="28"
                       ShadowDepth="6"
@@ -66,5 +165,10 @@
 
     <Duration x:Key="FastDuration">0:0:0.12</Duration>
     <Duration x:Key="MediumDuration">0:0:0.22</Duration>
+
+    <!-- Durée dédiée aux micro-interactions bouton (Phase 7) : plus courte
+         que FastDuration pour un scale/pulse au clic qui reste "instantané"
+         perceptuellement plutôt que perceptible comme une transition. -->
+    <Duration x:Key="MicroDuration">0:0:0.08</Duration>
 
 </ResourceDictionary>

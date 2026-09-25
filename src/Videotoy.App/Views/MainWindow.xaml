@@ -16,7 +16,7 @@
         WindowState="Maximized"
         AllowsTransparency="False"
         ResizeMode="CanResize"
-        Background="{StaticResource BackgroundBrush}"
+        Background="{StaticResource WindowBackgroundGradientBrush}"
         AllowDrop="True">
 
     <Window.Resources>
@@ -47,20 +47,6 @@
             MainWindowViewModel.ShaderIssuesFilterChanged fires.
         -->
         <CollectionViewSource x:Key="ShaderIssuesViewSource" />
-
-        <Storyboard x:Key="ExpandPanelStoryboard">
-            <DoubleAnimation Storyboard.TargetName="SettingsPanelColumn"
-                              Storyboard.TargetProperty="Width"
-                              To="320"
-                              Duration="{StaticResource MediumDuration}" />
-        </Storyboard>
-        <Storyboard x:Key="CollapsePanelStoryboard">
-            <DoubleAnimation Storyboard.TargetName="SettingsPanelColumn"
-                              Storyboard.TargetProperty="Width"
-                              To="0"
-                              Duration="{StaticResource MediumDuration}" />
-        </Storyboard>
-
 
         <!--
             Transition between the "Edit" mode (interactive shader preview,
@@ -113,6 +99,15 @@
 
     <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
         <Grid>
+        <!--
+            Grain de fond "vitamine" (Phase 7 du ROADMAP) : casse la planéité
+            du dégradé WindowBackgroundGradientBrush sans devenir un motif
+            visible en soi (opacité très faible) — IsHitTestVisible="False"
+            pour ne jamais intercepter un clic destiné au contenu en dessous.
+        -->
+        <Rectangle Fill="{StaticResource WindowBackgroundTextureBrush}"
+                   IsHitTestVisible="False"
+                   Opacity="0.5" />
         <DockPanel LastChildFill="True">
 
             <Border DockPanel.Dock="Top"
@@ -175,7 +170,18 @@
                                 <Separator />
                                 <MenuItem Header="{loc:Loc Key=menu.file.exit}" Click="OnExitClicked" />
                             </MenuItem>
-                            <MenuItem Header="{loc:Loc Key=menu.edit}" />
+                            <MenuItem Header="{loc:Loc Key=menu.edit}">
+                                <MenuItem Header="{loc:Loc Key=panel.history.undo}" Command="{Binding UndoCommand}" InputGestureText="Ctrl+Z">
+                                    <MenuItem.Icon>
+                                        <Path Data="{StaticResource IconUndo}" Style="{StaticResource HistoryIconStyle}" Width="14" Height="14" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{loc:Loc Key=panel.history.redo}" Command="{Binding RedoCommand}" InputGestureText="Ctrl+Y">
+                                    <MenuItem.Icon>
+                                        <Path Data="{StaticResource IconRedo}" Style="{StaticResource HistoryIconStyle}" Width="14" Height="14" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </MenuItem>
                             <MenuItem Header="{loc:Loc Key=menu.render}">
                                 <MenuItem Header="{loc:Loc Key=menu.render.exportMp4}" Command="{Binding ExportVideoCommand}">
                                     <MenuItem.Icon>
@@ -229,40 +235,92 @@
                     KeyboardNavigation.TabIndex="150">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding OpenShaderCommand}" ToolTip="{loc:Loc Key=menu.file.openShader}">
-                        <Path Data="{StaticResource IconFolderOpen}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconFolderOpen}" Style="{StaticResource EditIconStyle}" Width="14" Height="14" />
                     </Button>
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleEditorPanelCommand}" ToolTip="{loc:Loc Key=editor.panel.title}">
-                        <Path Data="{StaticResource IconCode}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconCode}" Style="{StaticResource EditIconStyle}" Width="14" Height="14" />
                     </Button>
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ExportVideoCommand}" ToolTip="{loc:Loc Key=action.exportToMp4}">
-                        <Path Data="{StaticResource IconExport}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconExport}" Width="14" Height="14" RenderTransformOrigin="0.5,0.5">
+                            <Path.Style>
+                                <Style TargetType="Path" BasedOn="{StaticResource ExportIconStyle}">
+                                    <Setter Property="RenderTransform">
+                                        <Setter.Value>
+                                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsExporting}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard Name="ExportPulseBeginStoryboard">
+                                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.22" Duration="0:0:0.6" />
+                                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.22" Duration="0:0:0.6" />
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.6" Duration="0:0:0.6" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="ExportPulseBeginStoryboard" />
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
                     </Button>
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ExportAnimatedImageCommand}" ToolTip="{loc:Loc Key=action.exportAnimatedImage}">
-                        <Path Data="{StaticResource IconExportAnimatedImage}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconExportAnimatedImage}" Style="{StaticResource ExportIconStyle}" Width="14" Height="14" />
                     </Button>
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ExportImageSequenceCommand}" ToolTip="{loc:Loc Key=action.exportImageSequence}">
-                        <Path Data="{StaticResource IconExportImageSequence}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconExportImageSequence}" Style="{StaticResource ExportIconStyle}" Width="14" Height="14" />
                     </Button>
 
                     <Rectangle Width="1" Height="20" Fill="{StaticResource BorderBrush}" Margin="6,0" />
 
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding UndoCommand}" ToolTip="{loc:Loc Key=panel.history.undo}">
-                        <Path Data="{StaticResource IconUndo}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconUndo}" Style="{StaticResource HistoryIconStyle}" Width="14" Height="14" />
                     </Button>
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RedoCommand}" ToolTip="{loc:Loc Key=panel.history.redo}">
-                        <Path Data="{StaticResource IconRedo}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconRedo}" Style="{StaticResource HistoryIconStyle}" Width="14" Height="14" />
                     </Button>
 
                     <Rectangle Width="1" Height="20" Fill="{StaticResource BorderBrush}" Margin="6,0" />
 
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleIssuesPanelCommand}" ToolTip="{loc:Loc Key=issues.panel.title}">
-                        <Path Data="{StaticResource IconWarning}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconWarning}" Style="{StaticResource DangerIconStyle}" Width="14" Height="14" />
                     </Button>
                     <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleExportHistoryPanelCommand}" ToolTip="{loc:Loc Key=export.history.panel.title}">
-                        <Path Data="{StaticResource IconClock}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconClock}" Style="{StaticResource HistoryIconStyle}" Width="14" Height="14" />
                     </Button>
                     <Button x:Name="RenderQueueToolbarButton" Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleRenderQueuePanelCommand}" ToolTip="{loc:Loc Key=renderQueue.panel.title}">
-                        <Path Data="{StaticResource IconRenderQueue}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                        <Path Data="{StaticResource IconRenderQueue}" Width="14" Height="14" RenderTransformOrigin="0.5,0.5">
+                            <Path.Style>
+                                <Style TargetType="Path" BasedOn="{StaticResource QueueIconStyle}">
+                                    <Setter Property="RenderTransform">
+                                        <Setter.Value>
+                                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRenderQueueRunning}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard Name="QueuePulseBeginStoryboard">
+                                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.22" Duration="0:0:0.6" />
+                                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.22" Duration="0:0:0.6" />
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.6" Duration="0:0:0.6" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="QueuePulseBeginStoryboard" />
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
                     </Button>
                 </StackPanel>
             </Border>
@@ -309,6 +367,7 @@
             </Border>
 
             <Border DockPanel.Dock="Bottom"
+                    Style="{StaticResource FadeInPanelBorderStyle}"
                     Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,1,0,0"
@@ -330,7 +389,7 @@
 
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="14,0,14,6">
                         <Path Data="{StaticResource IconFilter}"
-                              Style="{StaticResource VectorIconStyle}"
+                              Style="{StaticResource DangerIconStyle}"
                               Width="12"
                               Height="12"
                               Margin="0,0,8,0"
@@ -395,6 +454,7 @@
             </Border>
 
             <Border DockPanel.Dock="Bottom"
+                    Style="{StaticResource FadeInPanelBorderStyle}"
                     Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,1,0,0"
@@ -461,6 +521,7 @@
             </Border>
 
             <Border DockPanel.Dock="Bottom"
+                    Style="{StaticResource FadeInPanelBorderStyle}"
                     Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,1,0,0"
@@ -475,7 +536,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Path Grid.Column="0" Data="{StaticResource IconRenderQueue}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <Path Grid.Column="0" Data="{StaticResource IconRenderQueue}" Style="{StaticResource QueueIconStyle}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1" Text="{loc:Loc Key=renderQueue.panel.title}" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
                         <Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleRenderQueuePanelCommand}" ToolTip="{loc:Loc Key=renderQueue.panel.toggle.collapse}">
                             <Path Data="{StaticResource IconClose}" Style="{StaticResource VectorIconStyle}" Width="11" Height="11" />
@@ -514,14 +575,14 @@
                                 Command="{Binding StartRenderQueueCommand}"
                                 ToolTip="{loc:Loc Key=renderQueue.start}"
                                 Visibility="{Binding IsRenderQueueRunning, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                            <Path Data="{StaticResource IconPlay}" Style="{StaticResource VectorIconStyle}" Width="12" Height="12" />
+                            <Path Data="{StaticResource IconPlay}" Style="{StaticResource QueueIconStyle}" Width="12" Height="12" />
                         </Button>
                         <Button Grid.Column="4"
                                 Style="{StaticResource IconButtonStyle}"
                                 Command="{Binding PauseRenderQueueCommand}"
                                 ToolTip="{loc:Loc Key=renderQueue.pause}"
                                 Visibility="{Binding IsRenderQueueRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <Path Data="{StaticResource IconPause}" Style="{StaticResource VectorIconStyle}" Width="12" Height="12" />
+                            <Path Data="{StaticResource IconPause}" Style="{StaticResource QueueIconStyle}" Width="12" Height="12" />
                         </Button>
                         <Button Grid.Column="5"
                                 Content="{loc:Loc Key=renderQueue.resume}"
@@ -533,7 +594,7 @@
                                 Command="{Binding CancelRenderQueueCommand}"
                                 ToolTip="{loc:Loc Key=renderQueue.cancelAll}"
                                 Margin="6,0,0,0">
-                            <Path Data="{StaticResource IconClose}" Style="{StaticResource VectorIconStyle}" Width="11" Height="11" />
+                            <Path Data="{StaticResource IconClose}" Style="{StaticResource DangerIconStyle}" Width="11" Height="11" />
                         </Button>
                     </Grid>
 
@@ -890,11 +951,21 @@
                                 <TextBlock Text="{loc:Loc Key=editor.panel.title}" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
                                 <Ellipse Width="6"
                                          Height="6"
-                                         Fill="{StaticResource AccentBrush}"
+                                         Fill="{StaticResource EditAccentBrush}"
                                          Margin="6,0,0,0"
                                          VerticalAlignment="Center"
                                          ToolTip="{loc:Loc Key=editor.unsavedIndicator}"
-                                         Visibility="{Binding IsEditorDirty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                         Visibility="{Binding IsEditorDirty, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Ellipse.Triggers>
+                                        <EventTrigger RoutedEvent="Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.3" Duration="0:0:0.9" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Ellipse.Triggers>
+                                </Ellipse>
                             </StackPanel>
                             <Button Grid.Column="1" Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleEditorPanelCommand}" ToolTip="{loc:Loc Key=editor.panel.close}">
                                 <Path Data="{StaticResource IconClose}" Style="{StaticResource VectorIconStyle}" Width="11" Height="11" />
@@ -903,19 +974,19 @@
 
                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="14,0,14,6">
                             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding NewShaderCommand}" ToolTip="{loc:Loc Key=menu.file.newShader}">
-                                <Path Data="{StaticResource IconNewFile}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                                <Path Data="{StaticResource IconNewFile}" Style="{StaticResource EditIconStyle}" Width="14" Height="14" />
                             </Button>
                             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding SaveShaderCommand}" ToolTip="{loc:Loc Key=menu.file.save}">
-                                <Path Data="{StaticResource IconSave}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                                <Path Data="{StaticResource IconSave}" Style="{StaticResource EditIconStyle}" Width="14" Height="14" />
                             </Button>
                             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding SaveShaderAsCommand}" ToolTip="{loc:Loc Key=menu.file.saveAs}">
-                                <Path Data="{StaticResource IconSaveAs}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                                <Path Data="{StaticResource IconSaveAs}" Style="{StaticResource EditIconStyle}" Width="14" Height="14" />
                             </Button>
 
                             <Rectangle Width="1" Height="20" Fill="{StaticResource BorderBrush}" Margin="6,0" />
 
                             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CompileFromEditorCommand}" ToolTip="{loc:Loc Key=editor.compile.tooltip}">
-                                <Path Data="{StaticResource IconPlay}" Style="{StaticResource VectorIconStyle}" Width="14" Height="14" />
+                                <Path Data="{StaticResource IconPlay}" Style="{StaticResource ExportIconStyle}" Width="14" Height="14" />
                             </Button>
                         </StackPanel>
 

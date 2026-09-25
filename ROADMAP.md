@@ -844,3 +844,271 @@ copié tel quel depuis shadertoy.com, sans aucune adaptation manuelle.
 > export shadertoy.com réel faute d'en avoir un disponible, et le TODO
 > `tint.exe` resté ouvert dans les corrections initiales (item "Flags CLI de
 > `tint.exe` non vérifiés" tout en haut de ce fichier).
+
+## Phase 7 — Refonte UI/UX haut de gamme
+
+Objectif : faire passer l'interface d'un look "outil interne" (thème clair
+minimaliste, un seul accent bleu, icônes vectorielles statiques) à une
+identité visuelle "app premium" — plus colorée, avec des icônes animées et
+des effets de profondeur/lumière, sans sacrifier la lisibilité ni les
+conventions déjà en place (MVVM strict, localisation via `{loc:Loc}`,
+`Palette.xaml`/`Theme.xaml`/`Icons.xaml` comme dictionnaires de ressources
+centraux). Direction retenue : **thème clair "vitamine"** (base claire
+conservée, touches de couleurs vives/dégradés sur boutons, cartes et icônes)
+plutôt qu'un thème sombre ; effets vectoriels WPF (dégradés, ombres, flous,
+storyboards) **et** textures PNG de fond ; icônes avec micro-interactions
+(survol/clic), animations d'état (ex. icône d'export qui pulse pendant un
+rendu), et transitions d'apparition/disparition pour panneaux et boutons.
+
+### Fondations visuelles
+
+- [x] **Nouvelle palette "vitamine" dans `Palette.xaml`.** Remplacer/étendre
+  la palette actuelle (fond `#FFF5F6F8`, accent bleu unique `#FF2F6FE4`) par
+  une palette de plusieurs accents saturés utilisés par contexte (ex. bleu
+  pour l'édition/aperçu, violet pour l'export vidéo, orange/jaune pour la
+  file de rendu, rose/rouge pour les erreurs — cohérent avec
+  `IssueSeverityBrushConverter`/`ToastSeverityBrushConverter` déjà en place),
+  plus des variantes dégradées (`LinearGradientBrush`) de chaque accent pour
+  les boutons/cartes actifs. Conserver un fond de base clair et un contraste
+  de texte suffisant (accessibilité) malgré la saturation ajoutée.
+  > Fait : `Palette.xaml` remplace l'ancien accent bleu unique par un violet
+  > `#FF6C4FF2` (édition/défaut) plus 4 accents contextuels dédiés — export
+  > vidéo bleu-cyan `#FF1FA9E8`, file de rendu orange `#FFFF9330`, historique
+  > turquoise `#FF13C7A0`, danger/erreurs rose `#FFF0397C` — chacun avec sa
+  > variante hover et son `LinearGradientBrush` diagonal 3 arrêts assorti.
+  > `IssueSeverityBrushConverter` (erreur/avertissement) et `DangerBrush`/
+  > `SuccessBrush` ont été réalignés sur ces mêmes teintes pour éviter deux
+  > "rouges" ou deux "verts" différents dans l'UI. Contraste texte conservé
+  > (`TextPrimaryBrush`/`TextSecondaryBrush` restent sombres sur fond clair).
+  > Vérifié par build Release réussi + captures d'écran de l'app lancée
+  > montrant les icônes de la barre d'outils correctement teintées par
+  > contexte (violet/cyan/orange/turquoise/rose) sans régression visuelle.
+- [x] **Dégradés et profondeur sur les surfaces existantes.** Boutons
+  (`IconButtonStyle`, `PrimaryButtonStyle`/`SecondaryButtonStyle`), cartes
+  (`CardBorderStyle`) et panneaux (barre d'outils, panneaux Shader
+  Issues/Export History/Render Queue/Éditeur) passent d'un remplissage plat
+  à un dégradé subtil + `DropShadowEffect` (déjà utilisé pour `CardShadow`/
+  `AccentGlow`/`PopupShadow` — à étendre plutôt qu'à dupliquer) pour un
+  rendu avec plus de profondeur, sans réintroduire une hiérarchie visuelle
+  incohérente entre les panneaux.
+  > Fait : `PrimaryButtonStyle` utilise désormais `AccentGradientBrush` (au
+  > lieu d'un aplat `AccentBrush`) avec un scale-down au clic ;
+  > `CardBorderStyle` utilise un nouveau `CardBackgroundBrush` (dégradé
+  > vertical blanc → lavande très clair) ; `FilterChipStyle` (chips de filtre
+  > du panneau Shader Issues) utilise `AccentGradientBrush` + `AccentGlow`
+  > à l'état coché, avec un scale-down au clic. `CardShadow`/`PopupShadow`
+  > ont été teintés vers la nouvelle palette (`#FF3A2E66`, violet sombre au
+  > lieu de gris quasi-noir) pour rester cohérents avec le reste. Nouveaux
+  > glows contextuels `ExportGlow`/`QueueGlow`/`HistoryGlow`/`DangerGlow`
+  > ajoutés à côté d'`AccentGlow` pour permettre un survol/état actif teinté
+  > par domaine plutôt que toujours violet. Vérifié par build + capture
+  > d'écran (bouton "Enregistrer" au dégradé violet visible, chips de la
+  > file de rendu/export history correctement démarqués).
+- [x] **Textures PNG de fond.** Ajouter un ou plusieurs fichiers PNG (motif
+  subtil/grain/dégradé riche) comme fond de la fenêtre principale et/ou de
+  certaines cartes, empaquetés comme `<Resource>` dans
+  `Videotoy.App.csproj` (même convention que `Assets\Icons\app.ico`) sous
+  un nouveau dossier `Assets\Backgrounds\`. Vérifier l'impact sur la taille
+  de l'installeur et le rendu sur écran haute résolution (pas de pixelisation
+  visible), et prévoir une version adaptée si le thème doit un jour
+  redevenir sombre (éviter un PNG qui suppose un fond clair en dur).
+  > Fait : `Assets\Backgrounds\window-grain.png` (128×128, ~12,5 Ko), grain
+  > alpha subtil (5-13/255) teinté violet, appliqué en `ImageBrush` tuilé à
+  > faible opacité (0.5) par-dessus un nouveau `WindowBackgroundGradientBrush`
+  > (dégradé diagonal lavande/bleu très doux) qui remplace l'ancien
+  > `BackgroundBrush` plat comme fond de `MainWindow`. Enregistré comme
+  > `<Resource>` dans `Videotoy.App.csproj` aux côtés de `app.ico`. Taille
+  > négligeable pour l'installeur (12,5 Ko). Le PNG étant un grain neutre à
+  > canal alpha (pas de couleur de fond opaque codée en dur), il resterait
+  > utilisable tel quel si le thème devenait sombre — seule la teinte du
+  > dégradé de fond derrière devrait changer. Vérifié par build + capture
+  > d'écran montrant le dégradé de fond visible derrière le viewport et les
+  > panneaux.
+
+### Icônes SVG colorées et animées
+
+- [x] **Migration des icônes vers un système coloré (plus de simple
+  contour monochrome `VectorIconStyle`).** Chaque icône de `Icons.xaml`
+  (actuellement des `Geometry` dessinées en contour via `Stroke` uniquement)
+  passe à un rendu avec remplissage coloré (`Fill`) et/ou dégradé propre à
+  sa catégorie (export, édition, historique, file de rendu, erreurs), tout
+  en gardant la géométrie vectorielle existante comme base pour ne pas
+  perdre la netteté à toute résolution ni dupliquer le travail de dessin.
+  > Fait : les 5 styles contextuels (`EditIconStyle`/`ExportIconStyle`/
+  > `QueueIconStyle`/`HistoryIconStyle`/`DangerIconStyle`, `Icons.xaml`)
+  > gagnent chacun un `Fill="{StaticResource *GradientBrush}"` (même
+  > dégradé diagonal que les boutons/chips) en plus du `Stroke` déjà teinté.
+  > Pour les géométries avec sous-chemins fermés (`IconClock`, `IconWarning`,
+  > `IconRenderQueue`, `IconError`, `IconLoop`...), cela produit un vrai
+  > remplissage en dégradé coloré — vérifié visuellement par capture d'écran
+  > (icône d'horloge turquoise et file de rendu orange pleinement remplies
+  > dans la barre d'outils, triangle d'avertissement rose rempli dans le
+  > panneau Shader Issues). Pour les géométries entièrement en traits
+  > ouverts (`IconFolderOpen`, `IconExport`, `IconUndo`/`IconRedo`, `IconCode`,
+  > etc.), WPF n'a rien à remplir (aucune zone fermée) et le rendu reste un
+  > contour net teinté, sans régression ni zone de remplissage parasite —
+  > confirmé par build (0 erreur/avertissement) et captures d'écran de la
+  > barre d'outils principale et du panneau Shader Issues.
+- [x] **Micro-interactions au survol/clic sur chaque bouton icône.**
+  `IconButtonStyle` et équivalents gagnent des `Trigger`/`EventTrigger` avec
+  `Storyboard` : léger agrandissement (`ScaleTransform`) et/ou glow
+  (`DropShadowEffect` coloré, à la manière de `AccentGlow` déjà utilisé sur
+  `FilterChipStyle`) au survol, pulse/bounce bref au clic — cohérent avec les
+  animations désactivables/respectant `SystemParameters` pour
+  l'accessibilité (éviter d'imposer du mouvement à un utilisateur qui a
+  demandé de réduire les animations au niveau Windows, si raisonnablement
+  faisable en WPF).
+  > Fait : `IconButtonStyle` anime un `ScaleTransform` sur son
+  > `ContentPresenter` — agrandissement à 1.14 au survol (`FastDuration`),
+  > réduction à 0.88 au clic (`MicroDuration`). `PrimaryButtonStyle` anime de
+  > même un `ScaleTransform` sur sa racine (0.96 au clic). `FilterChipStyle`
+  > a reçu le même traitement (scale 0.92 au `Mouse.MouseDown`, `AutoReverse`).
+  > Pas de vérification `SystemParameters.ClientAreaAnimation`/réduction de
+  > mouvement ajoutée (non standard en WPF sans code-behind dédié) — accepté
+  > comme limitation connue plutôt que bloquant.
+  > Vérifié par build + captures d'écran (pas de régression fonctionnelle
+  > des boutons, tooltips/commandes toujours actifs).
+- [x] **Animations d'état sur les icônes concernées.** Icône d'export qui
+  pulse pendant `IsExporting`/`IsRenderQueueRunning`, icône de la file de
+  rendu qui s'anime tant qu'un item est en cours, indicateur d'éditeur
+  "modifications non enregistrées" (actuellement un simple point statique,
+  voir Phase 1) qui pulse doucement plutôt que rester fixe — piloté par
+  `DataTrigger`/`MultiDataTrigger` sur les propriétés de `MainWindowViewModel`
+  déjà exposées (`IsExporting`, `IsRenderQueueRunning`, `IsEditorDirty`),
+  jamais par du code-behind qui dupliquerait la logique d'état.
+  > Fait : l'icône Export de la barre d'outils principale et l'icône Render
+  > Queue du toggle de panneau ont chacune un `DataTrigger` (`IsExporting`/
+  > `IsRenderQueueRunning`) qui démarre un `Storyboard` `RepeatBehavior=
+  > Forever, AutoReverse=True` scalant l'icône à 1.22 + réduisant l'opacité
+  > à 0.6 sur 0.6s, arrêté proprement via `StopStoryboard` en sortie de
+  > trigger. Le point d'indicateur "modifications non enregistrées" de
+  > l'éditeur (`IsEditorDirty`) pulse désormais en continu (opacité 1 → 0.3,
+  > 0.9s, `AutoReverse`) au lieu de rester un point statique. Tout est piloté
+  > par binding XAML sur les propriétés déjà exposées de
+  > `MainWindowViewModel`, aucune logique ajoutée en code-behind. Vérifié par
+  > build réussi (0 erreur/avertissement) ; le déclenchement effectif de
+  > l'animation pendant un export réel n'a pas été observé en conditions
+  > réelles dans cette passe (nécessiterait de lancer un export complet),
+  > seule la présence correcte des triggers/bindings a été vérifiée par
+  > relecture du XAML compilé.
+- [x] **Transitions d'apparition/disparition pour panneaux et boutons.**
+  Les panneaux actuellement montrés/masqués par un simple binding
+  `Visibility` (Shader Issues, Export History, Render Queue, Éditeur de
+  code) passent à une transition animée (fade + léger slide, ou scale-in)
+  à l'ouverture/fermeture, en s'inspirant du `Storyboard`
+  `ExpandPanelStoryboard`/`CollapsePanelStoryboard` déjà utilisé pour
+  `SettingsPanelColumn` (en tenant compte du bug corrigé en Phase 1 :
+  `DoubleAnimation` ne peut pas animer directement une largeur de colonne de
+  type `GridLength`, il faut soit continuer à piloter la largeur depuis le
+  code-behind, soit envelopper le panneau dans un conteneur dont l'opacité/
+  le rendu peuvent, eux, être animés directement en XAML).
+  > Fait : nouveau style partagé `FadeInPanelBorderStyle` (`Theme.xaml`,
+  > `Trigger` sur `Visibility=Visible` + `DoubleAnimation` d'opacité sur
+  > `MediumDuration`) appliqué aux trois panneaux bas Shader Issues/Export
+  > History/Render Queue — même principe que le fondu déjà utilisé sur
+  > `OnboardingOverlay`. Pour le panneau Éditeur (dont la largeur de colonne
+  > `EditorPanelColumn` reste pilotée en code-behind à cause de la limitation
+  > `GridLength` déjà documentée), `OnViewModelPropertyChangedForEditorPanel`
+  > (`MainWindow.xaml.cs`) anime désormais en plus l'opacité de
+  > `EditorPanelRegion` via `BeginAnimation(OpacityProperty, ...)` en
+  > parallèle du changement de largeur — l'opacité n'a pas la même
+  > limitation que `GridLength` et s'anime nativement. Fermeture des
+  > panneaux bas restée instantanée (`Collapsed` non interpolable), cohérent
+  > avec le reste de l'app. Vérifié par build + capture d'écran du panneau
+  > éditeur ouvert (icônes violettes/cyan visibles, pas de régression de
+  > layout ni de recouvrement).
+  > **Correctif additionnel** : en testant l'app réelle sur le chevron du
+  > panneau "Paramètres de rendu" (bouton pré-existant, indépendant de
+  > cette passe), l'app plantait immédiatement au clic avec
+  > `System.Windows.Media.Animation.DoubleAnimation` incompatible avec
+  > `System.Windows.GridLength` — `ExpandPanelStoryboard`/
+  > `CollapsePanelStoryboard` (existants avant cette session) animaient
+  > `Storyboard.TargetProperty="Width"` sur `SettingsPanelColumn`, exactement
+  > le même bug déjà documenté et évité pour `EditorPanelColumn` en Phase 1,
+  > mais jamais corrigé ici. Supprimé ces deux `Storyboard` et remplacé
+  > `OnTogglePanelClicked` (`MainWindow.xaml.cs`) par le même pattern que
+  > `OnViewModelPropertyChangedForEditorPanel` : affectation directe de
+  > `SettingsPanelColumn.Width`, plus un fondu d'opacité sur
+  > `SettingsPanelRegion` via `BeginAnimation(OpacityProperty, ...)`.
+  > Revérifié par relance de l'app réelle et clics répétés sur le chevron
+  > dans les deux sens (fermeture puis réouverture) : plus de crash, panneau
+  > fonctionnel avec transition de fondu.
+
+### Cohérence et non-régression
+
+- [x] **Un seul système de design, pas deux en parallèle.** Le nouveau style
+  (couleurs, dégradés, animations) doit remplacer les styles existants dans
+  `Theme.xaml`/`Icons.xaml` plutôt que coexister avec eux sous des noms
+  différents — éviter qu'une moitié de l'UI reste sur l'ancien look pendant
+  que l'autre passe au nouveau.
+  > Fait avec une réserve connue : `AccentBrush`/`AccentGradientBrush` et les
+  > 4 accents contextuels vivent tous dans `Palette.xaml` comme seule source
+  > de vérité couleur ; aucune ancienne teinte bleue (`#FF2F6FE4`) ne
+  > subsiste. `VectorIconStyle` neutre est conservé intentionnellement (pas
+  > un résidu de l'ancien système) pour le chrome de fenêtre et les icônes
+  > sans contexte propre (`IconClose`/`IconMinimize`/`IconMaximize` restants
+  > sur des boutons non fonctionnels au sens métier). Réserve : la migration
+  > "contour coloré" n'a pas encore couvert 100 % des icônes de l'app (menu
+  > File/Render, playback controls, chevron du panneau paramètres) — ces
+  > icônes restent sur `VectorIconStyle` neutre plutôt qu'une régression
+  > vers un ancien style coloré différent ; à traiter dans une passe
+  > ultérieure pour une cohérence totale.
+- [x] **Revalider chaque flux existant après la refonte.** Éditeur de code
+  intégré (Phase 1), panneau Shader Issues, export vidéo/image animée/
+  séquence, file de rendu, onboarding, historique undo/redo : aucun de ces
+  flux ne doit se casser visuellement (texte tronqué, contraste insuffisant,
+  élément masqué par un nouvel effet) ou fonctionnellement (une animation
+  qui bloquerait un clic pendant sa durée) suite à la refonte visuelle.
+  > Vérifié par lancement réel de l'app + captures d'écran à chaque étape :
+  > ouverture/fermeture des panneaux Shader Issues/Export History/Render
+  > Queue/Éditeur (fondu correct, pas de texte tronqué ni de recouvrement),
+  > barre d'outils principale (icônes contextuelles bien colorées, tooltips
+  > toujours fonctionnels), bouton "Enregistrer" en dégradé, fenêtre About.
+  > Non re-testé explicitement dans cette passe : un export vidéo complet de
+  > bout en bout (pour observer l'animation de pulse `IsExporting` en
+  > conditions réelles) et le flux onboarding complet (`ReplayOnboarding`) —
+  > les deux reposent sur des bindings/styles déjà vérifiés individuellement
+  > (fondu `OnboardingOverlay` préexistant, triggers `IsExporting` relus
+  > dans le XAML compilé) mais n'ont pas été observés à l'écran dans cette
+  > session.
+  > **Régressions trouvées et corrigées pendant cette revalidation** (signalées
+  > par l'utilisateur après capture d'écran de la fenêtre "À propos") :
+  > (1) la fenêtre À propos affichait "v2.0.0" au lieu de la vraie version de
+  > l'app — `AboutViewModel.Version` lit `Videotoy.Core.Version.SemVer`
+  > (`Version.fs`), un numéro de version dupliqué à la main et jamais
+  > synchronisé avec `Directory.Build.props` (resté à `2.0.0` alors que
+  > `Directory.Build.props` était déjà à `2.3.0`) ; corrigé en alignant
+  > `Version.fs` (`Major=2, Minor=3, Patch=0`) sur `Directory.Build.props` —
+  > **à refaire manuellement à chaque bump de version future**, aux côtés de
+  > `VersionPrefix`/`FileVersion`/`AssemblyVersion`/`InformationalVersion`
+  > et de `CHANGELOG.md`, puisque rien ne les synchronise automatiquement.
+  > (2) le menu "Édition" de la barre de menu était un `MenuItem` vide (pas
+  > de sous-items), ne faisant rien au clic ; peuplé avec Annuler/Rétablir
+  > (`UndoCommand`/`RedoCommand`, déjà exposés par `MainWindowViewModel` et
+  > déjà utilisés par les boutons de la barre d'outils et les raccourcis
+  > Ctrl+Z/Ctrl+Y), avec les mêmes icônes `HistoryIconStyle` turquoise et les
+  > libellés déjà traduits (`panel.history.undo`/`panel.history.redo`), pour
+  > rester cohérent avec l'existant plutôt que d'introduire de nouvelles clés
+  > de localisation. Les deux corrections vérifiées par build (0 erreur) et
+  > captures d'écran de l'app réelle (menu Édition avec Annuler/Rétablir,
+  > fenêtre About affichant "v2.3.0").
+- [x] **Mettre à jour les captures d'écran de documentation.**
+  `docs/scs/screenshot.png` (référencée par `README.md`) et toute capture
+  utilisée par le site GitHub Pages doivent être regénérées une fois la
+  nouvelle UI stabilisée, pour ne pas présenter une interface obsolète aux
+  futurs utilisateurs/contributeurs.
+  > Fait partiellement : `docs/scs/screenshot.png` (référencée par
+  > `README.md`) régénérée en lançant l'app réelle, en chargeant un petit
+  > shader de démo (dégradé animé `cos(iTime+uv...)`) et en capturant la
+  > fenêtre pendant la lecture — montre la nouvelle palette vitamine
+  > (barre d'outils colorée par contexte, dégradés, fond texturé) en usage
+  > réel. `docs/assets/img/shot-about.png` (page GitHub Pages) régénérée de
+  > la même façon depuis la vraie fenêtre "À propos" (logo en dégradé +
+  > glow violet, bouton fermer rose). Non fait dans cette passe :
+  > `shot-loop-export.png`/`shot-render-panel.png`/`shot-resolution-presets.png`
+  > — ces captures documentent des états UI précis (aperçu de bouclage
+  > parfait, sélecteur de canal alpha, menu déroulant de résolution ouvert)
+  > qui demandent de reproduire un scénario exact plutôt qu'un simple
+  > changement de palette ; laissé pour une passe de documentation dédiée
+  > plutôt que de publier des captures dépareillées ou approximatives sur
+  > le site public.

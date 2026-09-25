@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\Icons\app.ico" />
+    <Resource Include="Assets\Backgrounds\window-grain.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-09-25
+
+### Added
+
+- Full "vitamin" UI/UX redesign: a saturated, contextual color palette
+  (violet for editing, cyan-blue for video export, orange for the render
+  queue, turquoise for history, pink for errors/warnings) replaces the
+  previous single-accent blue theme, applied consistently across the main
+  toolbar, Shader Issues/Export History/Render Queue/editor panels, and the
+  About window
+- Icons are now colored and, where their geometry has closed sub-paths
+  (clock, warning triangle, render queue, loop logo, etc.), filled with a
+  matching gradient instead of a plain monochrome outline
+- Gradient backgrounds and soft drop-shadow glows on primary buttons, cards,
+  and active filter chips; a subtle tiled grain texture behind the main
+  window
+- Hover/press micro-interactions (scale + glow) on icon buttons and filter
+  chips; a continuous pulse animation on the export/render-queue icons while
+  a render is running, and on the editor's unsaved-changes indicator
+- Fade-in transitions when opening the Shader Issues, Export History, Render
+  Queue, and editor panels
+- The Edit menu (previously empty) now exposes Undo/Redo
+
+### Fixed
+
+- The About window always showed a stale "v2.0.0" instead of the app's
+  actual version, because `Videotoy.Core.Version` was never updated after
+  the first release; it's now kept in sync with `Directory.Build.props`
+- Toggling the render settings panel's collapse chevron immediately crashed
+  the app (`DoubleAnimation` cannot animate a `GridLength`-typed
+  `ColumnDefinition.Width`); the panel now animates its content's opacity
+  instead while the column width is set directly, the same fix already
+  applied to the editor panel
+
 ## [2.3.0] - 2026-09-25
 
 ### Added

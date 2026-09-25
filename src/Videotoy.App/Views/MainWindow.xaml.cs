@@ -63,6 +63,14 @@ public partial class MainWindow : Window
         }
 
         EditorPanelColumn.Width = new GridLength(_viewModel.IsEditorPanelOpen ? EditorPanelOpenWidth : 0);
+
+        var fade = new DoubleAnimation
+        {
+            From = _viewModel.IsEditorPanelOpen ? 0d : 1d,
+            To = _viewModel.IsEditorPanelOpen ? 1d : 0d,
+            Duration = (Duration)FindResource("MediumDuration"),
+        };
+        EditorPanelRegion.BeginAnimation(OpacityProperty, fade);
     }
 
     /// <summary>
@@ -405,16 +413,29 @@ public partial class MainWindow : Window
         _viewModel.CloseIssuesPanelCommand.Execute(null);
     }
 
+    /// <summary>
+    /// Largeur du panneau paramètres de rendu une fois ouvert.
+    /// </summary>
+    private const double SettingsPanelOpenWidth = 320;
+
     private void OnTogglePanelClicked(object sender, RoutedEventArgs e)
     {
         _viewModel.ToggleSettingsPanelCommand.Execute(null);
 
-        var storyboardKey = _viewModel.IsSettingsPanelOpen
-            ? "ExpandPanelStoryboard"
-            : "CollapsePanelStoryboard";
+        // ColumnDefinition.Width est de type GridLength, qu'une
+        // DoubleAnimation ne peut pas animer (même limitation que
+        // EditorPanelColumn — voir OnViewModelPropertyChangedForEditorPanel) :
+        // affectation directe de Width, et seule l'opacité du contenu est
+        // animée pour conserver une transition visible à l'ouverture/fermeture.
+        SettingsPanelColumn.Width = new GridLength(_viewModel.IsSettingsPanelOpen ? SettingsPanelOpenWidth : 0);
 
-        var storyboard = (Storyboard)Resources[storyboardKey];
-        storyboard.Begin(this);
+        var fade = new DoubleAnimation
+        {
+            From = _viewModel.IsSettingsPanelOpen ? 0d : 1d,
+            To = _viewModel.IsSettingsPanelOpen ? 1d : 0d,
+            Duration = (Duration)FindResource("MediumDuration"),
+        };
+        SettingsPanelRegion.BeginAnimation(OpacityProperty, fade);
 
         TogglePanelIcon.Data = (System.Windows.Media.Geometry)FindResource(
             _viewModel.IsSettingsPanelOpen ? "IconChevronRight" : "IconChevronLeft");
